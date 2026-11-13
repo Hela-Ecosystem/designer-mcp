@@ -1282,17 +1282,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "get_reference": {
         const { name: refName } = args as { name: string };
         // CWE-22: the argument is a bare reference name, never a path.
-        const refPath = resolveWithinRoot(
-          join(SKILL_PATH, "references"),
-          refName,
-          {
-            label: "name",
-            extension: ".md",
-          },
-        );
+        const refsDir = join(SKILL_PATH, "references");
+        if (!existsSync(refsDir)) {
+          return textResult(
+            name,
+            `No reference documents are installed for the ui-designer skill ` +
+              `(expected directory: ${refsDir}). ` +
+              `The skill's references are not shipped with this checkout; ` +
+              `get_reference cannot return deep-dive docs until they are installed.`,
+          );
+        }
+        const refPath = resolveWithinRoot(refsDir, refName, {
+          label: "name",
+          extension: ".md",
+        });
         if (!existsSync(refPath)) {
           throw new Error(
-            `Reference not found: ${refName}. Available references are in ${SKILL_PATH}/references/`,
+            `Reference not found: ${refName}. Available references are in ${refsDir}/`,
           );
         }
         const content = readFileSync(refPath, "utf8");
