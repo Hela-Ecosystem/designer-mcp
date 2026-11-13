@@ -2,6 +2,14 @@
 
 All notable changes to this project.
 
+## [3.0.1] - 2026-11-13
+
+### Fixed
+- Corrected palette path resolution and missing-reference handling.
+
+### Changed
+- Updated dependency metadata and synchronized canonical documentation.
+
 ## [3.0.0] - 2026-10-31
 
 ### Changed
