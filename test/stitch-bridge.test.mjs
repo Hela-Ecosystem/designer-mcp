@@ -13,8 +13,12 @@ import {
   stitchScreenAudit,
 } from '../dist/stitch.js';
 
-test('Stitch Bridge: detects local stitch CLI binary', () => {
+test('Stitch Bridge: detects local stitch CLI binary when installed', (t) => {
   const cli = findStitchCli();
+  if (!cli) {
+    t.skip('Stitch CLI is an optional host integration and is not installed in CI');
+    return;
+  }
   assert.ok(cli);
   assert.equal(isStitchAvailable(), true);
 });
