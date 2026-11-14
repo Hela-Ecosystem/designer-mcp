@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, existsSync 
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveWithinRoot, PathContainmentError } from '../src/envelope.ts';
+import { resolveWithinRoot, assertBareName, PathContainmentError } from '../src/envelope.ts';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,6 +36,13 @@ const rejects = (fn, re) => {
   }
   assert.fail('expected a PathContainmentError');
 };
+
+t('validates a name without requiring the trusted root to exist', () => {
+  assert.equal(assertBareName('ant-design', 'name'), 'ant-design');
+  rejects(() => assertBareName('../../motion-designer/references/x', 'name'), /bare file name/);
+  rejects(() => assertBareName('..', 'name'), /absolute or traversing/);
+  rejects(() => assertBareName('', 'name'), /non-empty string/);
+});
 
 t('rejects the reported PoC (../ escape to a sibling skill)', () => {
   rejects(() => resolveWithinRoot(root, '../../motion-designer/references/motion-dev-guidelines',
