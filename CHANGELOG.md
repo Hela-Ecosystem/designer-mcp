@@ -2,7 +2,7 @@
 
 All notable changes to this project.
 
-## [Unreleased]
+## [3.0.2] - 2026-11-15
 
 ### Added
 - Added the `brand-architecture` skill for portfolio relationship models, naming hierarchy, visual/verbal linkage, migration, governance, and measurement planning.
