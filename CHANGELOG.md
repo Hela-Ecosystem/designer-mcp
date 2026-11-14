@@ -2,6 +2,12 @@
 
 All notable changes to this project.
 
+## [Unreleased]
+
+### Added
+- Added the `brand-architecture` skill for portfolio relationship models, naming hierarchy, visual/verbal linkage, migration, governance, and measurement planning.
+- Exposed the skill through `list_installed_skills` alongside the existing Phenotype design skills.
+
 ## [3.0.1] - 2026-11-13
 
 ### Fixed

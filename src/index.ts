@@ -203,6 +203,24 @@ function detectInstalledSkills(): Array<{
     });
   }
 
+  const brandArchitecturePath = join(
+    MCP_ROOT,
+    "skills/brand-architecture",
+  );
+  if (existsSync(join(brandArchitecturePath, "SKILL.md"))) {
+    skills.push({
+      name: "brand-architecture",
+      path: brandArchitecturePath,
+      description:
+        "Brand portfolio relationships, naming hierarchy, identity linkage, migration, and governance",
+      tools: [
+        "portfolio inventory and relationship map",
+        "architecture model decision matrix",
+        "naming hierarchy and governance framework",
+      ],
+    });
+  }
+
   return skills;
 }
 
