@@ -175,14 +175,7 @@ export class PathContainmentError extends Error {
  * (`pre_flight_scan`, the `logo_*` wrappers) intentionally do not use this: a
  * supplied project directory or artwork file is the feature, not a leak.
  */
-export function resolveWithinRoot(
-  rootDir: string,
-  userInput: string,
-  opts: { label: string; extension?: string; kind?: "file" | "dir" } = {
-    label: "path",
-  },
-): string {
-  const { label, extension, kind = "file" } = opts;
+export function assertBareName(userInput: string, label = "path"): string {
   if (typeof userInput !== "string" || userInput.trim() === "") {
     throw new PathContainmentError(`${label} must be a non-empty string`);
   }
@@ -202,6 +195,20 @@ export function resolveWithinRoot(
       `${label} must not be an absolute or traversing path: ${JSON.stringify(name)}`,
     );
   }
+  return name;
+}
+
+export function resolveWithinRoot(
+  rootDir: string,
+  userInput: string,
+  opts: { label: string; extension?: string; kind?: "file" | "dir" } = {
+    label: "path",
+  },
+): string {
+  const { label, extension, kind = "file" } = opts;
+  // Lexical checks run before the root check so callers can validate a name
+  // even when the bundled directory is absent.
+  const name = assertBareName(userInput, label);
   if (!existsSync(rootDir)) {
     throw new PathContainmentError(`trusted root is missing: ${rootDir}`);
   }

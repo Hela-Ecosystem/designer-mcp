@@ -56,6 +56,7 @@ import {
   textResult,
   errorResult,
   resolveWithinRoot,
+  assertBareName,
 } from "./envelope.js";
 import { normalizeToolCall } from "./tool-aliases.js";
 import {
@@ -1283,6 +1284,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name: refName } = args as { name: string };
         // CWE-22: the argument is a bare reference name, never a path.
         const refsDir = join(SKILL_PATH, "references");
+        // Validate the name before the missing-directory branch: traversal
+        // must remain an error even on checkouts without reference docs.
+        assertBareName(refName, "name");
         if (!existsSync(refsDir)) {
           return textResult(
             name,
