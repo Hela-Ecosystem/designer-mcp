@@ -2,6 +2,11 @@
 
 All notable changes to this project.
 
+## [3.0.3] - 2026-11-15
+
+### Added
+- Bundled Google's pinned `modern-web-guidance` skill and exposed it through `list_installed_skills`.
+
 ## [3.0.2] - 2026-11-15
 
 ### Added

@@ -221,6 +221,20 @@ function detectInstalledSkills(): Array<{
     });
   }
 
+  const modernWebGuidancePath = join(
+    MCP_ROOT,
+    "skills/modern-web-guidance",
+  );
+  if (existsSync(join(modernWebGuidancePath, "SKILL.md"))) {
+    skills.push({
+      name: "modern-web-guidance",
+      path: modernWebGuidancePath,
+      description:
+        "Pinned Google Chrome guidance for modern HTML, CSS, browser APIs, accessibility, and performance",
+      tools: ["modern-web-guidance CLI (search, retrieve, legacy-scan)"],
+    });
+  }
+
   return skills;
 }
 
