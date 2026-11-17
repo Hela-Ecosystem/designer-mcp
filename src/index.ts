@@ -10,6 +10,7 @@ import {
   stitchScreenAudit,
 } from "./stitch.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { MCP_SERVER_VERSION } from "./version.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
@@ -337,7 +338,7 @@ function runCommand(cmd: string, args: string[], cwd?: string): string {
 }
 
 const server = new Server(
-  { name: "the-designer", version: "3.0.3" },
+  { name: "the-designer", version: MCP_SERVER_VERSION },
   { capabilities: { tools: {} } },
 );
 

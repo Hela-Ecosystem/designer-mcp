@@ -1,5 +1,6 @@
 import { generateTailwindConfig } from "./tailwind-config.js";
 import { generateTemplate } from "./templates.js";
+import { MCP_SERVER_VERSION } from "./version.js";
 import {
   getComponent,
   COMPONENT_TYPES,
@@ -44,7 +45,7 @@ export function exportProject(
   const packageJson = JSON.stringify(
     {
       name: projectName,
-      version: "3.0.3",
+      version: MCP_SERVER_VERSION,
       scripts: {
         dev: "npx tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
         build:
