@@ -2,6 +2,11 @@
 
 All notable changes to this project.
 
+## [3.0.5] - 2026-11-19
+
+### Changed
+- npm audit fix clears two advisories; tool behaviour unchanged.
+
 ## [3.0.4] - 2026-11-18
 
 ### Fixed
