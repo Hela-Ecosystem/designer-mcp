@@ -28,6 +28,19 @@ export function findStitchCli(): string | null {
   return null;
 }
 
+/** Tools that cannot work without the Stitch CLI (designer-mcp#36). */
+export const STITCH_CLI_TOOLS: ReadonlySet<string> = new Set([
+  "stitch_create",
+  "stitch_find",
+  "stitch_generate",
+  "stitch_resource",
+  "stitch_sync_design_system",
+]);
+
+export function isStitchCliTool(name: string): boolean {
+  return STITCH_CLI_TOOLS.has(name);
+}
+
 export function isStitchAvailable(): boolean {
   return findStitchCli() !== null;
 }

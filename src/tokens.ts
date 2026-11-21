@@ -252,6 +252,47 @@ const THEMES: TokenTheme[] = [
   },
 ];
 
+/**
+ * Ottosson's OKLCH -> linear sRGB. Used only to keep derived colours displayable:
+ * hue 250 at L 55-65% has no chroma as high as accent+0.1 in sRGB, so the focus
+ * token used to be emitted outside the gamut (designer-mcp#35).
+ */
+function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
+  const L = l / 100;
+  const C = c / 100;
+  const H = (h * Math.PI) / 180;
+  const a = C * Math.cos(H);
+  const b = C * Math.sin(H);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  const l3 = l_ ** 3;
+  const m3 = m_ ** 3;
+  const s3 = s_ ** 3;
+  return [
+    4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
+  ];
+}
+
+function inSrgbGamut(rgb: [number, number, number], epsilon = 0.001): boolean {
+  return rgb.every((channel) => channel >= -epsilon && channel <= 1 + epsilon);
+}
+
+/** Largest chroma at or below `c` that stays inside sRGB, in the same 0-100 units. */
+function clampChromaToGamut(l: number, c: number, h: number): number {
+  if (inSrgbGamut(oklchToLinearSrgb(l, c, h))) return c;
+  let low = 0;
+  let high = c;
+  for (let i = 0; i < 24; i++) {
+    const mid = (low + high) / 2;
+    if (inSrgbGamut(oklchToLinearSrgb(l, mid, h))) low = mid;
+    else high = mid;
+  }
+  return Math.floor(low * 10) / 10;
+}
+
 function oklchStr(l: number, c: number, h: number): string {
   return `oklch(${l}% ${(c / 100).toFixed(3)} ${h})`;
 }
@@ -382,7 +423,7 @@ function generateThemeTokens(theme: TokenTheme): TokenSet {
       "--color-border": oklchStr(paperDarker, theme.paper.c, theme.paper.h),
       "--color-focus": oklchStr(
         theme.accent.l,
-        theme.accent.c + 10,
+        clampChromaToGamut(theme.accent.l, theme.accent.c + 10, theme.accent.h),
         theme.accent.h,
       ),
     },
@@ -492,7 +533,7 @@ export function deriveDarkTokens(theme: TokenTheme): TokenSet {
         accent.h,
       ),
       "--color-border": oklchStr(darkBorderL, darkPaperC, darkPaperH),
-      "--color-focus": oklchStr(darkAccentL, accent.c + 10, accent.h),
+      "--color-focus": oklchStr(darkAccentL, clampChromaToGamut(darkAccentL, accent.c + 10, accent.h), accent.h),
     };
   } else {
     // Dark → derive light
@@ -518,7 +559,7 @@ export function deriveDarkTokens(theme: TokenTheme): TokenSet {
         accent.h,
       ),
       "--color-border": oklchStr(lightBorderL, lightPaperC, lightPaperH),
-      "--color-focus": oklchStr(accent.l, accent.c + 10, accent.h),
+      "--color-focus": oklchStr(accent.l, clampChromaToGamut(accent.l, accent.c + 10, accent.h), accent.h),
     };
   }
 

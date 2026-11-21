@@ -8,7 +8,18 @@ import {
   stitchUrl,
   stitchSyncDesignSystem,
   stitchScreenAudit,
+  isStitchAvailable,
+  isStitchCliTool,
 } from "./stitch.js";
+
+function stitchToolsEnabled(): boolean {
+  // Explicit opt-out is useful when the CLI exists but the operator does not want the
+  // tools advertised; opt-in covers hosts where detection is wrong.
+  const flag = process.env.HELA_PHENOTYPE_STITCH;
+  if (flag === "0") return false;
+  if (flag === "1") return true;
+  return isStitchAvailable();
+}
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { MCP_SERVER_VERSION } from "./version.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -342,8 +353,8 @@ const server = new Server(
   { capabilities: { tools: {} } },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const tools = [
     {
       name: "generate_rules",
       description:
@@ -1181,8 +1192,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
-  ],
-}));
+  ];
+  return { tools: tools.filter((tool) => stitchToolsEnabled() || !isStitchCliTool(tool.name)) };
+});
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const normalized = normalizeToolCall(

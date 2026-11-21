@@ -91,7 +91,9 @@ export function generatePaletteVariants(colors: string[]): PaletteVariant[] {
     },
     {
       name: "High Contrast",
-      description: "Maximized contrast for accessibility (WCAG AAA)",
+      // Contrast is a property of a pair, so the claim names the surface it was
+      // measured against instead of asserting AAA on a single hex (designer-mcp#33).
+      description: "Maximized contrast against light backgrounds (AAA vs #ffffff)",
       colors: colors.map((c) => maximizeContrast(c, "#ffffff")),
     },
     {
@@ -99,7 +101,10 @@ export function generatePaletteVariants(colors: string[]): PaletteVariant[] {
       description: "Desaturated version for subtle backgrounds",
       colors: colors.map((c) => {
         const hsl = hexToHsl(c);
-        return hslToHex(hsl.h, Math.max(10, hsl.s - 30), hsl.l);
+        // Achromatic input has no hue to mute; re-adding saturation invented a red
+        // tint because undefined hue reads as 0 (designer-mcp#32).
+        if (hsl.s <= 1) return c;
+        return hslToHex(hsl.h, Math.max(0, hsl.s - 30), hsl.l);
       }),
     },
     {
@@ -107,6 +112,7 @@ export function generatePaletteVariants(colors: string[]): PaletteVariant[] {
       description: "Boosted saturation for emphasis and CTAs",
       colors: colors.map((c) => {
         const hsl = hexToHsl(c);
+        if (hsl.s <= 1) return c;
         return hslToHex(hsl.h, Math.min(100, hsl.s + 20), hsl.l);
       }),
     },

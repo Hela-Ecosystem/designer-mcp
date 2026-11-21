@@ -697,7 +697,6 @@ function checkColorContrastInline(html: string): CheckResult {
   const inlineStyleRe = /style\s*=\s*["']([^"']*)["']/gi;
   let m: RegExpExecArray | null;
 
-  // Map of CSS color names to hex for simple comparison
   const colorNames: Record<string, string> = {
     white: "#ffffff",
     black: "#000000",
@@ -708,13 +707,37 @@ function checkColorContrastInline(html: string): CheckResult {
     gray: "#808080",
     grey: "#808080",
     silver: "#c0c0c0",
-    transparent: "transparent",
   };
 
-  function normalizeColor(val: string): string {
-    const v = val.trim().toLowerCase();
-    return colorNames[v] ?? v;
-  }
+  const parseColor = (value: string): [number, number, number] | null => {
+    const raw = value.trim().toLowerCase();
+    if (raw === "transparent") return null;
+    const c = colorNames[raw] ?? raw;
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(c);
+    if (hex) {
+      const h = hex[1];
+      if (h.length === 3) {
+        return [0, 1, 2].map((i) => parseInt(h[i] + h[i], 16)) as [number, number, number];
+      }
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(c);
+    if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    return null;
+  };
+
+  const luminance = ([r, g, b]: [number, number, number]): number => {
+    const channel = (v: number) => {
+      const n = v / 255;
+      return n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  };
+
+  const contrastRatio = (a: [number, number, number], b: [number, number, number]): number => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
 
   while ((m = inlineStyleRe.exec(html)) !== null) {
     const styleStr = m[1];
@@ -722,28 +745,28 @@ function checkColorContrastInline(html: string): CheckResult {
     const bgMatch = /\bbackground(?:-color)?\s*:\s*([^;}"']+)/i.exec(styleStr);
     if (!colorMatch || !bgMatch) continue;
 
-    const fg = normalizeColor(colorMatch[1]);
-    const bg = normalizeColor(bgMatch[1]);
+    const fg = parseColor(colorMatch[1]);
+    const bg = parseColor(bgMatch[1]);
+    if (!fg || !bg) continue;
 
-    // Flag if obviously same colour
-    if (fg === bg && fg !== "transparent") {
-      // Find tag for context
-      const tagStart = html.lastIndexOf("<", m.index);
-      const tagEnd = html.indexOf(">", m.index);
-      const tag =
-        tagStart !== -1 && tagEnd !== -1
-          ? html.slice(tagStart, tagEnd + 1)
-          : m[0];
-      issues.push({
-        id: `color-contrast-inline`,
-        severity: "moderate",
-        rule: "color-contrast-inline",
-        wcag: "1.4.3",
-        description: `Inline style sets color and background to the same value ("${fg}"), making text invisible.`,
-        element: trunc(tag),
-        fix: "Ensure sufficient contrast between foreground and background colors (minimum ratio 4.5:1 for normal text).",
-      });
-    }
+    // WCAG 1.4.3: 4.5:1 for normal text. The previous check only caught identical
+    // colour strings, so white-on-white at 1.01:1 or yellow-on-white at 1.07:1
+    // passed and fed the score (designer-mcp#34).
+    const ratio = contrastRatio(fg, bg);
+    if (ratio >= 4.5) continue;
+
+    const tagStart = html.lastIndexOf("<", m.index);
+    const tagEnd = html.indexOf(">", m.index);
+    const tag = tagStart !== -1 && tagEnd !== -1 ? html.slice(tagStart, tagEnd + 1) : m[0];
+    issues.push({
+      id: `color-contrast-inline`,
+      severity: (ratio < 3 ? "serious" : "moderate") as Severity,
+      rule: "color-contrast-inline",
+      wcag: "1.4.3",
+      description: `Inline text contrast is ${ratio.toFixed(2)}:1 (${colorMatch[1].trim()} on ${bgMatch[1].trim()}), below the WCAG 1.4.3 minimum of 4.5:1.`,
+      element: trunc(tag),
+      fix: "Raise the foreground/background contrast to at least 4.5:1 for normal text (3:1 for large text).",
+    });
   }
   return issues;
 }

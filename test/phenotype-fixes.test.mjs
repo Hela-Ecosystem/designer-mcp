@@ -1,0 +1,100 @@
+import assert from 'node:assert/strict';
+import { generatePaletteVariants } from '../dist/palette-variants.js';
+import { auditA11y } from '../dist/a11y-audit.js';
+import { buildCustomTokens } from '../dist/tokens.js';
+import { isStitchCliTool, STITCH_CLI_TOOLS } from '../dist/stitch.js';
+
+let n = 0;
+const t = (name, fn) => { fn(); n++; console.log(`ok ${n} - ${name}`); };
+
+// #32 — achromatic input must not acquire a hue
+t('grey variants stay grey', () => {
+  const variants = generatePaletteVariants(['#767676']);
+  const muted = variants.find((v) => v.name === 'Muted').colors[0];
+  const vivid = variants.find((v) => v.name === 'Vivid').colors[0];
+  assert.equal(muted, '#767676', `Muted tinted the grey: ${muted}`);
+  assert.equal(vivid, '#767676', `Vivid tinted the grey: ${vivid}`);
+});
+
+t('coloured variants still move saturation', () => {
+  const variants = generatePaletteVariants(['#3b82f6']);
+  const muted = variants.find((v) => v.name === 'Muted').colors[0];
+  const vivid = variants.find((v) => v.name === 'Vivid').colors[0];
+  assert.notEqual(muted, '#3b82f6');
+  assert.notEqual(vivid, '#3b82f6');
+  assert.notEqual(muted, vivid);
+});
+
+// #33 — contrast claim names its surface
+t('high contrast label qualifies the background', () => {
+  const label = generatePaletteVariants(['#073c92']).find((v) => v.name === 'High Contrast').description;
+  assert.match(label, /against light backgrounds/i);
+  assert.match(label, /#ffffff/);
+});
+
+// #34 — inline contrast is measured, not string-matched
+t('invisible and low-contrast inline text fail the check', () => {
+  const html = `<!doctype html><html lang="en"><head><title>t</title></head><body><main>
+    <p style="color:#fefefe;background-color:#ffffff">invisible</p>
+    <span style="color:#ffff00;background-color:#ffffff">yellow on white</span>
+    <p style="color:#999999;background-color:#ffffff">grey on white</p>
+  </main></body></html>`;
+  const result = auditA11y(html);
+  const contrast = result.issues.filter((i) => i.rule === 'color-contrast-inline');
+  assert.equal(contrast.length, 3, `expected three contrast failures, got ${contrast.length}`);
+  assert.match(contrast[0].description, /1\.0\d:1/);
+  assert.ok(contrast.every((i) => i.severity === 'serious' || i.severity === 'moderate'));
+});
+
+t('passing contrast is not flagged', () => {
+  const html = `<!doctype html><html lang="en"><head><title>t</title></head><body><main>
+    <p style="color:#000000;background-color:#ffffff">fine</p>
+  </main></body></html>`;
+  const result = auditA11y(html);
+  assert.equal(result.issues.filter((i) => i.rule === 'color-contrast-inline').length, 0);
+});
+
+// #35 — derived focus token stays inside sRGB
+const oklchToLinearSrgb = (l, c, h) => {
+  const L = l / 100, C = c, H = (h * Math.PI) / 180;
+  const a = C * Math.cos(H), b = C * Math.sin(H);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  return [
+    4.0767416621 * l_ ** 3 - 3.3077115913 * m_ ** 3 + 0.2309699292 * s_ ** 3,
+    -1.2684380046 * l_ ** 3 + 2.6097574011 * m_ ** 3 - 0.3413193965 * s_ ** 3,
+    -0.0041960863 * l_ ** 3 - 0.7034186147 * m_ ** 3 + 1.707614701 * s_ ** 3,
+  ];
+};
+const parseOklch = (value) => {
+  const m = /oklch\(([\d.]+)%\s+([\d.]+)\s+([\d.]+)\)/.exec(value);
+  assert.ok(m, `not an oklch token: ${value}`);
+  return { l: Number(m[1]), c: Number(m[2]), h: Number(m[3]) };
+};
+
+t('focus token is clamped into the sRGB gamut', () => {
+  const result = buildCustomTokens(
+    { l: 97, c: 0.4, h: 90 },
+    { l: 55, c: 18, h: 250 },
+    'Plus Jakarta Sans',
+    'Inter',
+  );
+  for (const set of [result.tokens, result.dark_tokens]) {
+    const focus = parseOklch(set.colors['--color-focus']);
+    assert.ok(focus.c < 0.28, `focus chroma not reduced: ${focus.c}`);
+    const rgb = oklchToLinearSrgb(focus.l, focus.c, focus.h);
+    assert.ok(rgb.every((v) => v >= -0.002 && v <= 1.002), `out of gamut: ${JSON.stringify(rgb)}`);
+  }
+});
+
+// #36 — the CLI-dependent set is explicit and excludes the local audit
+t('stitch gating targets only CLI-dependent tools', () => {
+  assert.deepEqual([...STITCH_CLI_TOOLS].sort(), [
+    'stitch_create', 'stitch_find', 'stitch_generate', 'stitch_resource', 'stitch_sync_design_system',
+  ]);
+  assert.equal(isStitchCliTool('stitch_screen_audit'), false);
+  assert.equal(isStitchCliTool('stitch_get'), false);
+});
+
+console.log(`\n${n} phenotype fixes verified`);
