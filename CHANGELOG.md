@@ -2,6 +2,17 @@
 
 All notable changes to this project.
 
+## [3.1.0] - 2026-11-22
+
+### Changed
+- The five CLI-dependent Stitch tools (`stitch_create`, `stitch_find`, `stitch_generate`, `stitch_resource`, `stitch_sync_design_system`) are advertised only when the CLI is present. They were exposed on hosts without the binary, loading five dead schemas into every client and deferring the failure to call time. `stitch_screen_audit` stays: it is a local static analysis. Override with `HELA_PHENOTYPE_STITCH=1` (force on) or `0` (force off). 23 advertised tools without the CLI, 28 with.
+
+### Fixed
+- Inline contrast is measured, not string-matched. `design_audit` only flagged identical colour strings, so white-on-white at 1.01:1 and yellow-on-white at 1.07:1 passed and fed the score; the sample page graded A/96. It now computes WCAG 2.x relative luminance and fails anything under 4.5:1 (serious under 3:1). Same sample: B/75 with two measured issues. (`designer-mcp#34`)
+- Palette variants treat achromatic colours as achromatic. Muted and Vivid added saturation to greys because an undefined HSL hue reads as 0 (red), so `#767676` came back as `#816a6a`. Both now return the input unchanged when saturation is ~0, and Muted no longer floors saturation at 10%. (`designer-mcp#32`)
+- The "High Contrast" variant no longer asserts WCAG AAA on a single colour: contrast is a property of a pair, so the label names the surface it was measured against. (`designer-mcp#33`)
+- `design_tokens` clamps the derived `--color-focus` chroma into sRGB. Accent chroma +0.1 at hue 250 (L 55-65) is outside the gamut; the token is now the largest displayable chroma at that lightness and hue. (`designer-mcp#35`)
+
 ## [3.0.5] - 2026-11-19
 
 ### Changed
