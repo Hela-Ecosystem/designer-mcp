@@ -254,11 +254,7 @@ const THEMES: TokenTheme[] = [
   },
 ];
 
-/**
- * Ottosson's OKLCH -> linear sRGB. Used only to keep derived colours displayable:
- * hue 250 at L 55-65% has no chroma as high as accent+0.1 in sRGB, so the focus
- * token used to be emitted outside the gamut (designer-mcp#35).
- */
+/** Ottosson's OKLCH to linear sRGB conversion. */
 function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
   const L = l / 100;
   const C = c / 100;
@@ -278,25 +274,34 @@ function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, nu
   ];
 }
 
-function inSrgbGamut(rgb: [number, number, number], epsilon = 0.001): boolean {
+function inSrgbGamut(rgb: [number, number, number]): boolean {
+  const epsilon = 1e-9;
   return rgb.every((channel) => channel >= -epsilon && channel <= 1 + epsilon);
 }
 
-/** Largest chroma at or below `c` that stays inside sRGB, in the same 0-100 units. */
+/** Search in 0.001 CSS chroma steps so formatting cannot push a colour out of gamut. */
 function clampChromaToGamut(l: number, c: number, h: number): number {
-  if (inSrgbGamut(oklchToLinearSrgb(l, c, h))) return c;
+  const requested = Number((Math.max(0, c) / 100).toFixed(3));
+  let high = Math.round(requested * 1000);
+  if (inSrgbGamut(oklchToLinearSrgb(l, high / 10, h))) return high / 10;
+
   let low = 0;
-  let high = c;
-  for (let i = 0; i < 24; i++) {
-    const mid = (low + high) / 2;
-    if (inSrgbGamut(oklchToLinearSrgb(l, mid, h))) low = mid;
+  for (let i = 0; i < 24 && high - low > 1; i++) {
+    const mid = Math.floor((low + high) / 2);
+    if (inSrgbGamut(oklchToLinearSrgb(l, mid / 10, h))) low = mid;
     else high = mid;
   }
-  return Math.floor(low * 10) / 10;
+  return low / 10;
 }
 
 function oklchStr(l: number, c: number, h: number): string {
   return `oklch(${l}% ${(c / 100).toFixed(3)} ${h})`;
+}
+
+function derivedOklch(l: number, c: number, h: number): string {
+  // Derived offsets can exceed the CSS OKLCH lightness range for custom themes.
+  const lightness = Math.min(100, Math.max(0, l));
+  return oklchStr(lightness, clampChromaToGamut(lightness, c, h), h);
 }
 
 function computePaperBand(l: number): "light" | "mid" | "dark" {
@@ -396,18 +401,18 @@ function generateThemeTokens(theme: TokenTheme): TokenSet {
   return {
     colors: {
       "--color-paper": oklchStr(theme.paper.l, theme.paper.c, theme.paper.h),
-      "--color-paper-2": oklchStr(
+      "--color-paper-2": derivedOklch(
         paperLighter,
         theme.paper.c + 2,
         theme.paper.h,
       ),
-      "--color-paper-3": oklchStr(
+      "--color-paper-3": derivedOklch(
         paperDarker,
         theme.paper.c + 1,
         theme.paper.h,
       ),
-      "--color-text": oklchStr(paperLight, theme.paper.c + 3, theme.paper.h),
-      "--color-text-2": oklchStr(
+      "--color-text": derivedOklch(paperLight, theme.paper.c + 3, theme.paper.h),
+      "--color-text-2": derivedOklch(
         paperLight + 20,
         theme.paper.c + 5,
         theme.paper.h,
@@ -417,17 +422,13 @@ function generateThemeTokens(theme: TokenTheme): TokenSet {
         theme.accent.c,
         theme.accent.h,
       ),
-      "--color-accent-2": oklchStr(
+      "--color-accent-2": derivedOklch(
         theme.accent.l + 10,
         theme.accent.c - 5,
         theme.accent.h,
       ),
-      "--color-border": oklchStr(paperDarker, theme.paper.c, theme.paper.h),
-      "--color-focus": oklchStr(
-        theme.accent.l,
-        clampChromaToGamut(theme.accent.l, theme.accent.c + 10, theme.accent.h),
-        theme.accent.h,
-      ),
+      "--color-border": derivedOklch(paperDarker, theme.paper.c, theme.paper.h),
+      "--color-focus": derivedOklch(theme.accent.l, theme.accent.c + 10, theme.accent.h),
     },
     fonts: {
       "--font-display": theme.fontDisplay,
@@ -507,6 +508,10 @@ function tokensToCSS(tokens: TokenSet, theme: TokenTheme): string {
  *  Only color tokens are modified; fonts, spacing, text sizes, easings,
  *  durations, and radii are copied as-is from the light token set. */
 export function deriveDarkTokens(theme: TokenTheme): TokenSet {
+  return deriveCounterpartTokens(theme, generateThemeTokens(theme));
+}
+
+function deriveCounterpartTokens(theme: TokenTheme, base: TokenSet): TokenSet {
   const { paper, accent } = theme;
   let darkColors: Record<string, string>;
 
@@ -523,19 +528,19 @@ export function deriveDarkTokens(theme: TokenTheme): TokenSet {
     const darkBorderL = 25;
 
     darkColors = {
-      "--color-paper": oklchStr(darkPaperL, darkPaperC, darkPaperH),
-      "--color-paper-2": oklchStr(darkPaper2L, darkPaperC + 2, darkPaperH),
-      "--color-paper-3": oklchStr(darkPaper3L, darkPaperC + 1, darkPaperH),
-      "--color-text": oklchStr(darkTextL, darkPaperC + 3, darkPaperH),
-      "--color-text-2": oklchStr(darkTextL2, darkPaperC + 5, darkPaperH),
-      "--color-accent": oklchStr(darkAccentL, accent.c, accent.h),
-      "--color-accent-2": oklchStr(
+      "--color-paper": derivedOklch(darkPaperL, darkPaperC, darkPaperH),
+      "--color-paper-2": derivedOklch(darkPaper2L, darkPaperC + 2, darkPaperH),
+      "--color-paper-3": derivedOklch(darkPaper3L, darkPaperC + 1, darkPaperH),
+      "--color-text": derivedOklch(darkTextL, darkPaperC + 3, darkPaperH),
+      "--color-text-2": derivedOklch(darkTextL2, darkPaperC + 5, darkPaperH),
+      "--color-accent": derivedOklch(darkAccentL, accent.c, accent.h),
+      "--color-accent-2": derivedOklch(
         Math.min(darkAccentL + 10, 99),
         Math.max(accent.c - 5, 0),
         accent.h,
       ),
-      "--color-border": oklchStr(darkBorderL, darkPaperC, darkPaperH),
-      "--color-focus": oklchStr(darkAccentL, clampChromaToGamut(darkAccentL, accent.c + 10, accent.h), accent.h),
+      "--color-border": derivedOklch(darkBorderL, darkPaperC, darkPaperH),
+      "--color-focus": derivedOklch(darkAccentL, accent.c + 10, accent.h),
     };
   } else {
     // Dark → derive light
@@ -549,33 +554,30 @@ export function deriveDarkTokens(theme: TokenTheme): TokenSet {
     const lightBorderL = 85;
 
     darkColors = {
-      "--color-paper": oklchStr(lightPaperL, lightPaperC, lightPaperH),
-      "--color-paper-2": oklchStr(lightPaper2L, lightPaperC + 2, lightPaperH),
-      "--color-paper-3": oklchStr(lightPaper3L, lightPaperC + 1, lightPaperH),
-      "--color-text": oklchStr(lightTextL, lightPaperC + 3, lightPaperH),
-      "--color-text-2": oklchStr(lightTextL2, lightPaperC + 5, lightPaperH),
-      "--color-accent": oklchStr(accent.l, accent.c, accent.h),
-      "--color-accent-2": oklchStr(
+      "--color-paper": derivedOklch(lightPaperL, lightPaperC, lightPaperH),
+      "--color-paper-2": derivedOklch(lightPaper2L, lightPaperC + 2, lightPaperH),
+      "--color-paper-3": derivedOklch(lightPaper3L, lightPaperC + 1, lightPaperH),
+      "--color-text": derivedOklch(lightTextL, lightPaperC + 3, lightPaperH),
+      "--color-text-2": derivedOklch(lightTextL2, lightPaperC + 5, lightPaperH),
+      "--color-accent": base.colors["--color-accent"],
+      "--color-accent-2": derivedOklch(
         Math.min(accent.l + 10, 99),
         Math.max(accent.c - 5, 0),
         accent.h,
       ),
-      "--color-border": oklchStr(lightBorderL, lightPaperC, lightPaperH),
-      "--color-focus": oklchStr(accent.l, clampChromaToGamut(accent.l, accent.c + 10, accent.h), accent.h),
+      "--color-border": derivedOklch(lightBorderL, lightPaperC, lightPaperH),
+      "--color-focus": base.colors["--color-focus"],
     };
   }
 
-  // Build a placeholder light token set just to grab the non-color sections
-  const light = generateThemeTokens(theme);
-
   return {
     colors: darkColors,
-    fonts: light.fonts,
-    spacing: light.spacing,
-    text: light.text,
-    easings: light.easings,
-    durations: light.durations,
-    radii: light.radii,
+    fonts: { ...base.fonts },
+    spacing: { ...base.spacing },
+    text: { ...base.text },
+    easings: { ...base.easings },
+    durations: { ...base.durations },
+    radii: { ...base.radii },
   };
 }
 
@@ -671,7 +673,7 @@ export function generateTokens(
   }
   twLines.push("}");
 
-  const dark_tokens = deriveDarkTokens(theme);
+  const dark_tokens = deriveCounterpartTokens(theme, tokens);
   const dark_css = darkTokensToCSS(dark_tokens, theme);
   const full_css = css + dark_css;
 
@@ -719,7 +721,7 @@ export function buildCustomTokens(
   }
   twLines.push("}");
 
-  const dark_tokens = deriveDarkTokens(theme);
+  const dark_tokens = deriveCounterpartTokens(theme, tokens);
   const dark_css = darkTokensToCSS(dark_tokens, theme);
   const full_css = css + dark_css;
 
