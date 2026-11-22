@@ -2,6 +2,11 @@
 
 All notable changes to this project.
 
+## [3.2.1] - 2026-11-22
+
+### Fixed
+- `get_component` React output is a real component: it merges `className`, renders `children`, forwards `onClick`/`disabled`/remaining props and a ref, and derives its classes from the requested style and palette instead of returning a hard-coded demo gallery. Carbon and neo-brutalism now produce different components, and the test typechecks and renders the snippet. (`designer-mcp#42`)
+
 ## [3.2.0] - 2026-11-22
 
 ### Fixed
