@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 import {
   STYLES,
@@ -43,10 +44,6 @@ import {
   BRAND_CATEGORY_NAMES,
   summarizeBrandCatalog,
 } from "../dist/brands.js";
-import {
-  fetchTools,
-  renderToolDocs,
-} from "../scripts/generate-tool-docs.mjs";
 
 let n = 0;
 const t = (name, fn) => {
@@ -54,6 +51,50 @@ const t = (name, fn) => {
   n++;
   console.log(`ok ${n} - ${name}`);
 };
+
+/**
+ * Live tools/list from the built server. docs/TOOLS.md itself is owned by the
+ * ecosystem generator (`npm run docs:generate -- --servers`), so this only reads
+ * the count and names to compare against README claims.
+ */
+function fetchTools() {
+  const child = spawnSync(
+    process.execPath,
+    [new URL("../dist/index.js", import.meta.url).pathname],
+    {
+      input: [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "consistency", version: "1" },
+          },
+        }),
+        JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+        "",
+      ].join("\n"),
+      encoding: "utf8",
+      env: { ...process.env, HELA_PHENOTYPE_STITCH: "1" },
+      timeout: 30000,
+    },
+  );
+  const reply = String(child.stdout || "")
+    .split("\n")
+    .map((entry) => {
+      try {
+        return JSON.parse(entry);
+      } catch {
+        return null;
+      }
+    })
+    .find((entry) => entry?.id === 2);
+  assert.ok(reply, "the built server answered tools/list");
+  return reply.result.tools;
+}
 
 const tools = fetchTools();
 const byName = new Map(tools.map((tool) => [tool.name, tool]));
@@ -209,21 +250,8 @@ t("scoped slop gate counts come from the gate catalogue", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Docs: generated from the same registry, README numbers match live data
+// README numbers must match the live data
 // ---------------------------------------------------------------------------
-
-t("docs/TOOLS.md is the generated tools/list rendering", () => {
-  const expected = renderToolDocs(tools);
-  const actual = readFileSync(
-    new URL("../docs/TOOLS.md", import.meta.url),
-    "utf8",
-  );
-  assert.equal(
-    actual,
-    expected,
-    "docs/TOOLS.md is stale; run `npm run docs:generate`",
-  );
-});
 
 t("README published counts agree with the live data", () => {
   const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");

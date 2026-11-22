@@ -2,6 +2,11 @@
 
 All notable changes to this project.
 
+## [3.2.3] - 2026-11-23
+
+### Fixed
+- The tool reference is owned by the ecosystem generator. 3.2.2 added a local generator for `docs/TOOLS.md`, which produced a second, incompatible format and failed CI once the ecosystem regenerated the file. The local generator and its `docs:generate`/`docs:check` scripts are removed; the consistency test still reads a live `tools/list` and checks the README counts against it.
+
 ## [3.2.2] - 2026-11-23
 
 ### Fixed
