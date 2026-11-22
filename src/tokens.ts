@@ -274,6 +274,18 @@ function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, nu
   ];
 }
 
+/** Encode a theme colour (percentage L and C, hue in degrees) as 8-bit sRGB. */
+export function oklchToHex({ l, c, h }: TokenTheme["accent"]): string {
+  const bytes = oklchToLinearSrgb(l, c, h).map((channel) => {
+    const linear = Math.min(1, Math.max(0, channel));
+    const srgb = linear <= 0.0031308
+      ? 12.92 * linear
+      : 1.055 * linear ** (1 / 2.4) - 0.055;
+    return Math.round(srgb * 255).toString(16).padStart(2, "0");
+  });
+  return `#${bytes.join("").toUpperCase()}`;
+}
+
 function inSrgbGamut(rgb: [number, number, number]): boolean {
   const epsilon = 1e-9;
   return rgb.every((channel) => channel >= -epsilon && channel <= 1 + epsilon);

@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { generatePaletteVariants } from '../dist/palette-variants.js';
 import { auditA11y } from '../dist/a11y-audit.js';
 import { buildCustomTokens, generateTokens, listThemes } from '../dist/tokens.js';
@@ -77,6 +82,25 @@ const parseOklch = (value) => {
   return { l: Number(m[1]), c: Number(m[2]), h: Number(m[3]) };
 };
 
+// Convert the canvas's 8-bit sRGB value back to OKLCH for comparison.
+function hexToOklch(hex) {
+  assert.match(hex, /^#[\da-f]{6}$/i);
+  const [r, g, b] = hex.slice(1).match(/../g).map((byte) => {
+    const srgb = Number.parseInt(byte, 16) / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  });
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const labB = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  return {
+    l: 100 * (0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s),
+    c: Math.hypot(a, labB),
+    h: (Math.atan2(labB, a) * 180 / Math.PI + 360) % 360,
+  };
+}
+
 // #40 — catalogue colours fit sRGB before token generation
 t('all stored theme colours are inside the sRGB gamut', () => {
   const outOfGamut = [];
@@ -139,6 +163,58 @@ t('stitch gating targets only CLI-dependent tools', () => {
   ]);
   assert.equal(isStitchCliTool('stitch_screen_audit'), false);
   assert.equal(isStitchCliTool('stitch_get'), false);
+});
+
+// #37 — the canvas and CSS receive the same in-gamut accent.
+t('stitch sync writes matching canvas and Markdown accents in sRGB', () => {
+  const targetDir = mkdtempSync(join(tmpdir(), 'phenotype-stitch-sync-'));
+  try {
+    const call = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
+      // Enable the Stitch CLI gate explicitly. Sync itself only writes local files.
+      env: { ...process.env, HELA_PHENOTYPE_STITCH: '1', HELA_ENVELOPE: 'false' },
+      input: [
+        { jsonrpc: '2.0', id: 1, method: 'initialize',
+          params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'stitch-regression', version: '1' } } },
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        { jsonrpc: '2.0', id: 2, method: 'tools/call',
+          params: { name: 'stitch_sync_design_system', arguments: { themeName: 'Studio', style: 'minimal', targetDir } } },
+      ].map((request) => JSON.stringify(request)).join('\n') + '\n',
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+    assert.ifError(call.error);
+    assert.equal(call.status, 0, call.stderr);
+    const reply = call.stdout.trim().split('\n').map((line) => JSON.parse(line))
+      .find((message) => message.id === 2);
+    assert.ok(reply?.result && !reply.result.isError, call.stdout);
+    assert.equal(JSON.parse(reply.result.content[0].text).theme, 'Studio');
+
+    const markdown = readFileSync(join(targetDir, 'DESIGN.md'), 'utf8');
+    const { designSystem } = JSON.parse(readFileSync(join(targetDir, '.stitch', 'design-system.json'), 'utf8'));
+    const markdownColors = Object.fromEntries(
+      [...markdown.matchAll(/^- `--color-([\w-]+)`: `(oklch\([^)]+\))`$/gm)]
+        .map(([, name, value]) => [name, value]),
+    );
+    assert.deepEqual(Object.keys(designSystem.tokens).sort(), ['accent', 'border', 'paper', 'text']);
+    for (const [name, value] of Object.entries(designSystem.tokens)) {
+      assert.equal(markdownColors[name], value, name);
+    }
+    assert.deepEqual(Object.keys(markdownColors).sort(), ['accent', 'border', 'paper', 'paper-2', 'text']);
+    for (const value of Object.values(markdownColors)) {
+      const { l, c, h } = parseOklch(value);
+      assert.ok(isInSrgb(oklchToLinearSrgb(l, c, h)), `${value} is outside sRGB`);
+    }
+
+    const token = parseOklch(markdownColors.accent);
+    const canvas = hexToOklch(designSystem.theme.customColor);
+    const hueDelta = Math.abs(canvas.h - token.h);
+    // Allow for rounding to 8-bit sRGB.
+    assert.ok(Math.min(hueDelta, 360 - hueDelta) < 1, `accent hue differs: ${canvas.h}° vs ${token.h}°`);
+    assert.ok(Math.abs(canvas.c - token.c) < 0.002, `accent chroma differs: ${canvas.c} vs ${token.c}`);
+    assert.ok(Math.abs(canvas.l - token.l) < 0.3, `accent lightness differs: ${canvas.l}% vs ${token.l}%`);
+  } finally {
+    rmSync(targetDir, { recursive: true, force: true });
+  }
 });
 
 console.log(`\n${n} phenotype fixes verified`);

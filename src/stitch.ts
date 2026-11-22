@@ -14,7 +14,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { generateTokens, getTheme, listThemes } from "./tokens.js";
+import { generateTokens, oklchToHex } from "./tokens.js";
 import { auditA11y } from "./a11y-audit.js";
 import { runSlopTest, selfCritique } from "./anti-patterns.js";
 
@@ -294,8 +294,7 @@ export function stitchSyncDesignSystem(args: {
     mkdirSync(dotStitchDir, { recursive: true });
   }
 
-  const theme = getTheme(args.themeName || "Obsidian Kinetic") || listThemes()[0];
-  const tokenSet = generateTokens(theme.name);
+  const { theme, tokens: { colors } } = generateTokens(args.themeName || "Obsidian Kinetic");
 
   // Synthesize Stitch-compliant designSystem JSON
   const headlineFont = theme.fontDisplay.split(",")[0].replace(/['"]/g, "").trim();
@@ -309,14 +308,14 @@ export function stitchSyncDesignSystem(args: {
         headlineFont: headlineFont.toUpperCase().replace(/\s+/g, "_"),
         bodyFont: bodyFont.toUpperCase().replace(/\s+/g, "_"),
         colorMode: isDark ? "DARK" : "LIGHT",
-        customColor: isDark ? "#10B981" : "#3B82F6",
+        customColor: oklchToHex(theme.accent),
         roundness: "ROUND_SIXTEEN",
       },
       tokens: {
-        paper: tokenSet.tokens.colors["--color-paper"],
-        accent: tokenSet.tokens.colors["--color-accent"],
-        border: tokenSet.tokens.colors["--color-border"],
-        text: tokenSet.tokens.colors["--color-text"],
+        paper: colors["--color-paper"],
+        accent: colors["--color-accent"],
+        border: colors["--color-border"],
+        text: colors["--color-text"],
       },
     },
   };
@@ -342,11 +341,11 @@ export function stitchSyncDesignSystem(args: {
 - **Hierarchy Guideline**: Extreme heading-to-body contrast (\`clamp(2.5rem, 8vw, 7rem)\`) with tight tracking on headings.
 
 ## 3. OKLCH Color Tokens
-- \`--color-paper\`: \`${tokenSet.tokens.colors["--color-paper"]}\`
-- \`--color-paper-2\`: \`${tokenSet.tokens.colors["--color-paper-2"]}\`
-- \`--color-accent\`: \`${tokenSet.tokens.colors["--color-accent"]}\`
-- \`--color-text\`: \`${tokenSet.tokens.colors["--color-text"]}\`
-- \`--color-border\`: \`${tokenSet.tokens.colors["--color-border"]}\`
+- \`--color-paper\`: \`${colors["--color-paper"]}\`
+- \`--color-paper-2\`: \`${colors["--color-paper-2"]}\`
+- \`--color-accent\`: \`${colors["--color-accent"]}\`
+- \`--color-text\`: \`${colors["--color-text"]}\`
+- \`--color-border\`: \`${colors["--color-border"]}\`
 
 ## 4. Interaction & Motion Rules
 - Tactile physics with magnetic cursor bounds on primary interactive elements.
