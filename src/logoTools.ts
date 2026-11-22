@@ -183,22 +183,10 @@ export function auditLogo(input: LogoAuditInput): unknown {
   }
 }
 
-const LIBRARY_FILTERS = [
-  "type",
-  "symbol-type",
-  "technique",
-  "geometry",
-  "industry",
-  "subject",
-  "query",
-  "mood",
-  "color",
-  "primary-color",
-  "aspect",
-  "variant",
-  "type-style",
-  "case",
-] as const;
+export const LOGO_LIBRARY_QUERY_DESCRIPTION =
+  "Free-text words matched against file name, brand, subject, note, mood, industry, mark/symbol type, technique, geometry, type style, and other catalog fields. All terms must match.";
+export const LOGO_LIBRARY_FORMAT_DESCRIPTION =
+  "Search output format (default json). JSON returns an array of hits or an object explaining zero matches.";
 
 export interface LogoLibrarySearchInput {
   type?: string;
@@ -225,7 +213,7 @@ export interface LogoLibrarySearchInput {
   listValues?: boolean;
 }
 
-const FILTER_KEYS: Record<string, string> = {
+const FILTER_KEYS = {
   type: "--type",
   symbolType: "--symbol-type",
   technique: "--technique",
@@ -240,14 +228,14 @@ const FILTER_KEYS: Record<string, string> = {
   variant: "--variant",
   typeStyle: "--type-style",
   case: "--case",
-};
+} as const;
 
 export function searchLogoLibrary(
   input: LogoLibrarySearchInput,
 ): LogoRunResult {
   const argv: string[] = [];
-  for (const key of LIBRARY_FILTERS) {
-    const value = (input as Record<string, unknown>)[key];
+  for (const key of Object.keys(FILTER_KEYS) as Array<keyof typeof FILTER_KEYS>) {
+    const value = input[key];
     if (value !== undefined && value !== null) {
       argv.push(FILTER_KEYS[key], String(value));
     }
@@ -571,8 +559,7 @@ export function logoToolSchemas() {
           },
           query: {
             type: "string",
-            description:
-              "Free-text words matched against file name, subject, note, mood",
+            description: LOGO_LIBRARY_QUERY_DESCRIPTION,
           },
           mood: {
             type: "string",
@@ -622,7 +609,7 @@ export function logoToolSchemas() {
           format: {
             type: "string",
             enum: ["table", "paths", "json"],
-            description: "Output shape (default json)",
+            description: LOGO_LIBRARY_FORMAT_DESCRIPTION,
           },
           summary: {
             type: "boolean",

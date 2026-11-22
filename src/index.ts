@@ -95,6 +95,8 @@ import {
 import { auditA11y } from "./a11y-audit.js";
 import { generateCSSOutput, type CSSOutputFormat } from "./css-output.js";
 import {
+  LOGO_LIBRARY_FORMAT_DESCRIPTION,
+  LOGO_LIBRARY_QUERY_DESCRIPTION,
   logoSkillAvailable,
   logoSkillRoot,
   auditLogo,
@@ -845,7 +847,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           geometry: { type: "string", description: "Search geometry" },
           industry: { type: "string", description: "Search industry" },
           subject: { type: "string", description: "Search visual subject" },
-          query: { type: "string", description: "Free-text library query" },
+          query: { type: "string", description: LOGO_LIBRARY_QUERY_DESCRIPTION },
           mood: { type: "string", description: "Search mood adjective" },
           color: { type: "string", description: "Search colour family" },
           primaryColor: { type: "string", description: "Dominant colour family" },
@@ -861,7 +863,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           format: {
             type: "string",
             enum: ["table", "paths", "json"],
-            description: "Search output shape",
+            description: LOGO_LIBRARY_FORMAT_DESCRIPTION,
           },
           summary: { type: "boolean", description: "Aggregate library view" },
           listValues: { type: "boolean", description: "Print filter values" },
@@ -1758,7 +1760,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const run: LogoRunResult = searchLogoLibrary(
             args as Parameters<typeof searchLogoLibrary>[0],
           );
-          return textResult(name, run.stdout);
+          return textResult(name, run.stdout || run.stderr);
         }
         if (action === "renderers") {
           const run = availableRenderers();

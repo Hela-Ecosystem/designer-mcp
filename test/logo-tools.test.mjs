@@ -347,6 +347,66 @@ t("library search returns JSON rows from the library catalogue", () => {
   );
 });
 
+const libraryDir = join(LOGO_SKILL_PATH, "assets", "library");
+const librarySize = readdirSync(join(libraryDir, "svg"))
+  .filter((file) => file.endsWith(".svg")).length;
+
+t("free-text bank matches the finance-banking facet in the shipped library", () => {
+  const hits = JSON.parse(searchLogoLibrary({ query: "bank", limit: 3 }).stdout);
+  assert.deepEqual(hits.map((hit) => hit.file), [
+    "ycombinator.svg", "corda.svg", "xero.svg",
+  ]);
+  for (const hit of hits) {
+    assert.equal(hit.industry, "finance-banking");
+    assert.ok(hit.score > 0);
+    assert.ok(hit.why.bank.includes("industry"));
+  }
+});
+
+t("free-text geometric matches actual geometry tags", () => {
+  const hits = JSON.parse(searchLogoLibrary({ query: "geometric" }).stdout);
+  const vercel = hits.find((hit) => hit.file === "vercel-icon.svg");
+  assert.deepEqual(vercel?.geometry, ["triangle"]);
+  assert.ok(vercel.why.geometric.includes("geometry"));
+});
+
+t("a facet and a word rank actual facet matches ahead of text-only mentions", () => {
+  const hits = JSON.parse(searchLogoLibrary({ query: "triangle blue", limit: 500 }).stdout);
+  const shape = hits.findIndex((hit) => hit.file === "atlassian.svg");
+  const mention = hits.findIndex((hit) => hit.file === "leankit.svg");
+  assert.ok(shape >= 0 && mention > shape);
+  assert.ok(hits[shape].why.triangle.includes("geometry"));
+  assert.ok(!hits[mention].why.triangle.includes("geometry"));
+  assert.ok(hits[shape].score > hits[mention].score);
+});
+
+t("a nonsense query reports zero results and the searched catalog size", () => {
+  const result = JSON.parse(searchLogoLibrary({ query: "qzxvmplqzz" }).stdout);
+  assert.deepEqual(result.results, []);
+  assert.equal(result.count, 0);
+  assert.equal(result.total, librarySize);
+  assert.match(result.reason, /qzxvmplqzz/);
+  for (const field of ["file", "brand", "subject", "industry", "techniques", "geometry"]) {
+    assert.ok(result.searchedFields.includes(field), field);
+  }
+});
+
+t("a query with no intersection suggests matching facets from the library", () => {
+  const result = JSON.parse(searchLogoLibrary({ query: "fintech shield" }).stdout);
+  assert.deepEqual(result.results, []);
+  assert.match(result.reason, /all terms/);
+  assert.ok(result.suggestions.includes("industry: payments-fintech"));
+  assert.ok(result.suggestions.includes("geometry: shield"));
+});
+
+t("the library summary counts the entries in the shipped SVG library", () => {
+  const catalog = JSON.parse(readFileSync(join(libraryDir, "catalog.json"), "utf8"));
+  assert.ok(librarySize > 0);
+  assert.equal(catalog.length, librarySize);
+  const run = searchLogoLibrary({ summary: true });
+  assert.ok(run.stdout.startsWith(`${librarySize} logos match (of ${librarySize}).`));
+});
+
 t("library search summary reports category conventions", () => {
   const run = searchLogoLibrary({
     type: "lettermark",

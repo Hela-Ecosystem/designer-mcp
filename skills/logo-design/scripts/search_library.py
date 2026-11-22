@@ -25,6 +25,21 @@ sys.dont_write_bytecode = True  # keep the skill folder clean (no __pycache__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import svglib  # noqa: E402
 
+FACET_FILTERS = {
+    "industry": "industry",
+    "mark_type": "type",
+    "symbol_type": "symbolType",
+    "techniques": "technique",
+    "geometry": "geometry",
+    "type_style": "typeStyle",
+    "case": "case",
+    "mood": "mood",
+    "color_families": "color",
+    "primary_family": "primaryColor",
+    "aspect_class": "aspect",
+    "variant": "variant",
+}
+
 
 def load_catalog():
     if not os.path.exists(svglib.CATALOG_PATH):
@@ -68,11 +83,71 @@ def matches(r, a):
         return False
     if a.subject and a.subject.lower() not in (r.get("subject") or "").lower():
         return False
-    if a.query:
-        hay = " ".join([r.get("file", ""), r.get("subject") or "", r.get("note") or "", " ".join(r.get("mood", []))]).lower()
-        if not all(w in hay for w in a.query.lower().split()):
-            return False
     return True
+
+
+def field_values(value):
+    return value if isinstance(value, list) else [value]
+
+
+def matches_term(term, field, value):
+    if isinstance(value, str):
+        return term in value.casefold()
+    if isinstance(value, bool):
+        return value and term in field.replace("_", " ").split()
+    return value is not None and term == str(value)
+
+
+def rank_query(row, terms):
+    score = 0
+    why = {}
+    for term in terms:
+        fields = [field for field, value in row.items()
+                  if any(matches_term(term, field, item) for item in field_values(value))]
+        geometric = term == "geometric" and any(
+            shape not in {"organic", "freeform"} for shape in row.get("geometry", [])
+        )
+        if not fields and not geometric:
+            return None
+        score += max((2 if field in FACET_FILTERS else 1 for field in fields), default=0)
+        if geometric and "geometry" not in fields:
+            fields.append("geometry")
+            score += 1
+        why[term] = fields
+    return {**row, "score": score, "why": why}
+
+
+def empty_search(cat, query, terms, filtered):
+    searched_fields = sorted({field for row in cat for field in row}) if terms else []
+    if not cat:
+        reason = "The library contains no logos."
+    elif terms:
+        scope = " with the selected filters" if filtered else ""
+        reason = f"No logos matched all terms in {query!r}{scope}."
+    else:
+        reason = "No logos matched the selected filters."
+
+    suggestions = {}
+    if terms:
+        for field, filter_name in FACET_FILTERS.items():
+            values = {value for row in cat for value in field_values(row.get(field)) if value}
+            for value in values:
+                folded = value.casefold()
+                if any(term in folded for term in terms):
+                    suggestions[f"{filter_name}: {value}"] = folded not in terms
+    return {
+        "results": [], "count": 0, "total": len(cat), "reason": reason,
+        "searchedFields": searched_fields,
+        "suggestions": sorted(suggestions, key=lambda hint: (suggestions[hint], hint))[:8],
+    }
+
+
+def explain_empty(result, stream):
+    print(f"{result['reason']} Searched {result['total']} library marks.", file=stream)
+    if result["searchedFields"]:
+        print("Fields searched:", ", ".join(result["searchedFields"]), file=stream)
+    if result["suggestions"]:
+        print("Try filters:", "; ".join(result["suggestions"]), file=stream)
 
 
 def summary(rows, total):
@@ -120,7 +195,8 @@ def main():
     ap.add_argument("--case", help="lowercase|uppercase|titlecase|mixed")
     ap.add_argument("--mood", help="single mood adjective, e.g. friendly, technical, playful")
     ap.add_argument("--subject", help="substring of the visual subject, e.g. bird, shield, cloud, letter a")
-    ap.add_argument("--query", help="free-text words matched against file name, subject, note, mood")
+    ap.add_argument("--query", help="free-text words matched against file name, brand, subject, note, mood, "
+                    "industry, mark/symbol type, technique, geometry, type style, and other catalog fields (AND)")
     ap.add_argument("--exemplary", action="store_true", help="only strong teaching examples")
     ap.add_argument("--no-gradient", action="store_true")
     ap.add_argument("--limit", type=int, default=25)
@@ -151,7 +227,7 @@ def main():
             continue
         close = [k for k in known if val.lower() in k.lower() or k.lower() in val.lower()]
         if len(close) == 1:
-            print(f"(--{attr.replace('_', '-')} '{val}' → using '{close[0]}')")
+            print(f"(--{attr.replace('_', '-')} '{val}' → using '{close[0]}')", file=sys.stderr)
             setattr(a, attr, close[0])
         else:
             hint = ", ".join(close) if close else ", ".join(known)
@@ -168,24 +244,36 @@ def main():
                 continue
             close = [k for k in known if part.lower() in k.lower()]
             if len(close) == 1:
-                print(f"(--{attr} '{part}' → using '{close[0]}')")
+                print(f"(--{attr} '{part}' → using '{close[0]}')", file=sys.stderr)
                 fixed.append(close[0])
             else:
                 sys.exit(f"unknown --{attr} '{part}'. Did you mean: {', '.join(close) if close else ', '.join(known)}")
         setattr(a, attr, ",".join(fixed))
 
     rows = [r for r in cat if matches(r, a)]
-    rows.sort(key=lambda r: (not r.get("exemplary"), r.get("anchors", 0)))
+    filtered = len(rows) < len(cat)
+    terms = list(dict.fromkeys((a.query or "").casefold().split()))
+    if terms:
+        rows = [hit for row in rows if (hit := rank_query(row, terms)) is not None]
+    rows.sort(key=lambda r: (-r.get("score", 0), not r.get("exemplary"), r.get("anchors", 0)))
     if a.summary:
         summary(rows, len(cat))
-        return
-    shown = rows[: a.limit]
-    if a.format == "json":
+        if not rows:
+            explain_empty(empty_search(cat, a.query, terms, filtered), sys.stdout)
+    elif not rows:
+        empty = empty_search(cat, a.query, terms, filtered)
+        if a.format == "json":
+            print(json.dumps(empty, ensure_ascii=False, indent=1))
+        else:
+            explain_empty(empty, sys.stderr if a.format == "paths" else sys.stdout)
+    elif a.format == "json":
+        shown = rows[: a.limit]
         print(json.dumps(shown, ensure_ascii=False, indent=1))
     elif a.format == "paths":
-        for r in shown:
+        for r in rows[: a.limit]:
             print(os.path.join(svglib.LIBRARY_SVG_DIR, r["file"]))
     else:
+        shown = rows[: a.limit]
         print(f"{len(rows)} match, showing {len(shown)}  (★ = exemplary; files in {svglib.LIBRARY_SVG_DIR})")
         for r in shown:
             star = "★" if r.get("exemplary") else " "
