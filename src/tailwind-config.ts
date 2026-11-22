@@ -282,7 +282,7 @@ function generateColorRamp(paletteType: string): Record<string, string> {
 function getAccentColors(
   style: string,
   paletteType: string,
-): Record<string, string> {
+): { primary: string; secondary: string; accent: string } {
   if (paletteType === "dark") {
     return { primary: "#3b82f6", secondary: "#8b5cf6", accent: "#06b6d4" };
   }
@@ -302,7 +302,12 @@ export interface TailwindConfig {
   content: string[];
   theme: {
     extend: {
-      colors: Record<string, any>;
+      colors: {
+        surface: Record<string, string>;
+        primary: string;
+        secondary: string;
+        accent: string;
+      };
       fontFamily: Record<string, string[]>;
       borderRadius: Record<string, string>;
       boxShadow: Record<string, string>;

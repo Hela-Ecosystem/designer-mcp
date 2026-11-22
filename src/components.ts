@@ -1,4 +1,5 @@
 import { mapComponent } from "./map-component.js";
+import { generateTailwindConfig } from "./tailwind-config.js";
 
 export type ComponentType =
   | "button"
@@ -143,6 +144,86 @@ function buttonComponent(style: string): string {
   <button class="${v.btnGhost}">Ghost</button>
   <button class="${v.btnPrimary} opacity-50 cursor-not-allowed" disabled>Disabled</button>
 </div>`;
+}
+
+function buttonForeground(hex: string): string {
+  const luminance = [0.2126, 0.7152, 0.0722].reduce((sum, weight, index) => {
+    const offset = 1 + index * 2;
+    const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    const linear = channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    return sum + weight * linear;
+  }, 0);
+  const blackContrast = (luminance + 0.05) / 0.05;
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  return blackContrast > whiteContrast ? "text-black" : "text-white";
+}
+
+function reactButtonComponent(style: string, palette?: string): string {
+  const { config } = generateTailwindConfig(style, palette ?? "");
+  const { colors, fontFamily, borderRadius, boxShadow } = config.theme.extend;
+  const carbon = style === "carbon";
+  const primary = carbon && !palette ? "#0f62fe" : colors.primary;
+  const secondary = palette ? colors.surface[800] : "#393939";
+  const secondaryHover = palette ? colors.surface[700] : "#4c4c4c";
+  const surfaceHover = palette ? colors.surface[100] : "#e8e8e8";
+  const { btnPrimary, btnSecondary, btnOutline, btnGhost } = variantClasses(style);
+  const carbonBase = "px-4 py-3 text-sm font-normal";
+  const variants = carbon
+    ? {
+        primary: `${carbonBase} bg-primary text-white hover:brightness-90 transition-[filter]`,
+        secondary: `${carbonBase} bg-[${secondary}] text-white hover:bg-[${secondaryHover}] transition-colors`,
+        outline: `${carbonBase} border border-[${secondary}] text-[${secondary}] hover:bg-[${surfaceHover}] transition-colors`,
+        ghost: `${carbonBase} text-[${secondary}] hover:bg-[${surfaceHover}] transition-colors`,
+      }
+    : { primary: btnPrimary, secondary: btnSecondary, outline: btnOutline, ghost: btnGhost };
+
+  const fonts = (style === "awwwards" ? fontFamily.mono : fontFamily.sans)
+    .join(",")
+    .replaceAll('"', "")
+    .replaceAll(" ", "_");
+  const radius = borderRadius.lg === "0px" ? "rounded-none" : `rounded-[${borderRadius.lg}]`;
+  const primaryClasses = `bg-[${primary}] ${buttonForeground(primary)}`;
+  const shadow = `shadow-[${boxShadow.md.replaceAll(" ", "_")}]`;
+  const base = `inline-flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50 font-[family-name:${fonts}]`;
+  for (const variant of Object.keys(variants) as (keyof typeof variants)[]) {
+    let classes = variants[variant]
+      .replace("bg-primary text-white", primaryClasses)
+      .replace("neo-shadow", shadow)
+      .replace("rounded-lg", radius);
+    if (!classes.includes("rounded-")) classes += ` ${radius}`;
+    if (palette) {
+      classes = classes.replace(/\bslate-(\d+)\b/g, (_, shade: string) => `[${colors.surface[shade]}]`);
+      if (style === "glass" || style === "awwwards") {
+        classes = classes.replace(/\b((?:border|bg)-)white\b/g, `$1[${colors.surface[50]}]`);
+      }
+    }
+    variants[variant] = classes
+      .replace(/(^| )((?:(?:hover|active):)?(?:scale-|translate-|transition-|duration-))/g, "$1motion-safe:$2")
+      .replace(/\b(hover|active):/g, "enabled:$1:");
+  }
+
+  return `import React from 'react';
+
+const variantClasses = ${JSON.stringify(variants, null, 2)};
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: keyof typeof variantClasses;
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, children, onClick, disabled, variant = 'primary', type = 'button', ...props },
+  ref,
+) {
+  const classes = [${JSON.stringify(base)}, variantClasses[variant], className].filter(Boolean).join(' ');
+  return (
+    <button {...props} ref={ref} type={type} className={classes} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+});
+
+export default Button;
+`;
 }
 
 function cardComponent(style: string): string {
@@ -564,11 +645,6 @@ function capitalize(s: string): string {
 
 /** Per-component prop interface bodies for React wrappers. */
 const REACT_PROP_INTERFACES: Record<string, string> = {
-  Button: `  className?: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  disabled?: boolean;
-  children?: React.ReactNode;
-  onClick?: () => void;`,
   Card: `  className?: string;
   title?: string;
   description?: string;
@@ -796,7 +872,12 @@ export function getComponent(
   type: ComponentType,
   style: string,
   framework: OutputFramework = "html",
+  palette?: string,
 ): string {
+  if (type === "button" && framework === "react") {
+    return reactButtonComponent(style, palette);
+  }
+
   let html: string;
   switch (type) {
     case "button":

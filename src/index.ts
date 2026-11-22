@@ -619,6 +619,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             description:
               "Output framework (default: html). 'react' returns a TypeScript FC with typed props. 'vue' returns a Vue 3 SFC with script setup.",
           },
+          palette: {
+            type: "string",
+            enum: Object.keys(PALETTES),
+            description: "Optional color palette for React buttons.",
+          },
         },
         required: ["component", "style"],
       },
@@ -1501,12 +1506,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           component,
           style,
           framework = "html",
-        } = args as { component: string; style: string; framework?: string };
+          palette,
+        } = args as {
+          component: string;
+          style: string;
+          framework?: string;
+          palette?: unknown;
+        };
         if (!COMPONENT_TYPES.includes(component as any))
           throw new Error(
             `Unknown component: ${component}. Available: ${COMPONENT_TYPES.join(", ")}`,
           );
-        if (!(style in STYLES))
+        if (!Object.hasOwn(STYLES, style))
           throw new Error(
             `Unknown style: ${style}. Available: ${Object.keys(STYLES).join(", ")}`,
           );
@@ -1514,10 +1525,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error(
             `Unknown framework: ${framework}. Available: ${OUTPUT_FRAMEWORKS.join(", ")}`,
           );
+        if (
+          palette !== undefined &&
+          (typeof palette !== "string" || !Object.hasOwn(PALETTES, palette))
+        ) {
+          throw new Error(
+            `Unknown palette. Available: ${Object.keys(PALETTES).join(", ")}`,
+          );
+        }
         const output = _getComponent(
           component as any,
           style,
           framework as OutputFramework,
+          palette,
         );
         return textResult(name, output);
       }
