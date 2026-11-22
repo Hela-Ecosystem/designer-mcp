@@ -2,6 +2,16 @@
 
 All notable changes to this project.
 
+## [3.2.0] - 2026-11-22
+
+### Fixed
+- Every stored theme colour is inside sRGB again, and so is every derived one. The 19 accents and 19 papers carried 1.1x-3.1x the displayable chroma, and the paper-band/text/accent-2 derivations added more; a walk of the full tool response found 79 out-of-gamut values after the catalogue was fixed. Stored values are clamped at 3-decimal CSS precision (lightness and hue preserved) and all derivations go through `derivedOklch`. Verified externally: 0 of 342 emitted values out of gamut. (`designer-mcp#40`)
+- `stitch_sync_design_system` writes one accent, not two. `DESIGN.md` and `.stitch/design-system.json` now come from the same resolved theme (`oklchToHex` of the accent), so the canvas hex and the oklch token agree; the hard-coded `#3B82F6`/`#10B981` alternates are gone. (`designer-mcp#37`)
+- `generate_template` applies its palette. The browser shell assigned the CommonJS build output to a `<script>`, so `module.exports` never reached Tailwind and the CTA rendered unstyled; it now assigns `tailwind.config`. (`designer-mcp#44`)
+- `generate_8state_component` renders eight states. State classes are merged into a single `class` attribute (a second one was discarded), the toggle has a 48 px track with real hover/focus/active styling, Loading/Error/Success differ structurally, and the script pins anime 3.2.2 with a guarded bootstrap. Headless Chrome: 8 of 8 distinct computed-style signatures. (`designer-mcp#38`)
+- `logo_workflow search` matches the whole catalogue. Free text now covers industry, mark/symbol type, technique, geometry, type style, case, mood, colour and aspect, reports which field matched, and a zero result returns a reason, the catalogue total, the searched fields and facet suggestions. (`designer-mcp#39`)
+- `export_project` covers `index.html` in the Tailwind `content` globs, so the exported page is not built unstyled. Verified by matching every emitted HTML file against the config. (`designer-mcp#43`)
+
 ## [3.1.0] - 2026-11-22
 
 ### Changed
