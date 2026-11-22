@@ -1,21 +1,41 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { generatePaletteVariants } from '../dist/palette-variants.js';
 import { auditA11y } from '../dist/a11y-audit.js';
 import { buildCustomTokens, generateTokens, listThemes } from '../dist/tokens.js';
 import { isStitchCliTool, STITCH_CLI_TOOLS } from '../dist/stitch.js';
-import { exportProject } from '../dist/export.js';
 import { ARCHETYPES, PALETTES, STYLES } from '../dist/rules.js';
 import { generateTailwindConfig } from '../dist/tailwind-config.js';
 import { generateTemplate } from '../dist/templates.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log(`ok ${n} - ${name}`); };
+
+function callDesignerTool(name, args, env = {}) {
+  const call = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
+    env: { ...process.env, HELA_ENVELOPE: 'false', ...env },
+    input: [
+      { jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'phenotype-regression', version: '1' } } },
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } },
+    ].map((request) => JSON.stringify(request)).join('\n') + '\n',
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  assert.ifError(call.error);
+  assert.equal(call.status, 0, call.stderr);
+  const reply = call.stdout.trim().split('\n').map((line) => JSON.parse(line))
+    .find((message) => message.id === 2);
+  assert.ok(reply?.result && !reply.result.isError, call.stdout);
+  return JSON.parse(reply.result.content[0].text);
+}
 
 // #32 — achromatic input must not acquire a hue
 t('grey variants stay grey', () => {
@@ -174,25 +194,10 @@ t('stitch gating targets only CLI-dependent tools', () => {
 t('stitch sync writes matching canvas and Markdown accents in sRGB', () => {
   const targetDir = mkdtempSync(join(tmpdir(), 'phenotype-stitch-sync-'));
   try {
-    const call = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/index.js', import.meta.url))], {
-      // Enable the Stitch CLI gate explicitly. Sync itself only writes local files.
-      env: { ...process.env, HELA_PHENOTYPE_STITCH: '1', HELA_ENVELOPE: 'false' },
-      input: [
-        { jsonrpc: '2.0', id: 1, method: 'initialize',
-          params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'stitch-regression', version: '1' } } },
-        { jsonrpc: '2.0', method: 'notifications/initialized' },
-        { jsonrpc: '2.0', id: 2, method: 'tools/call',
-          params: { name: 'stitch_sync_design_system', arguments: { themeName: 'Studio', style: 'minimal', targetDir } } },
-      ].map((request) => JSON.stringify(request)).join('\n') + '\n',
-      encoding: 'utf8',
-      timeout: 10_000,
-    });
-    assert.ifError(call.error);
-    assert.equal(call.status, 0, call.stderr);
-    const reply = call.stdout.trim().split('\n').map((line) => JSON.parse(line))
-      .find((message) => message.id === 2);
-    assert.ok(reply?.result && !reply.result.isError, call.stdout);
-    assert.equal(JSON.parse(reply.result.content[0].text).theme, 'Studio');
+    // Enable the Stitch CLI gate explicitly. Sync itself only writes local files.
+    const result = callDesignerTool('stitch_sync_design_system',
+      { themeName: 'Studio', style: 'minimal', targetDir }, { HELA_PHENOTYPE_STITCH: '1' });
+    assert.equal(result.theme, 'Studio');
 
     const markdown = readFileSync(join(targetDir, 'DESIGN.md'), 'utf8');
     const { designSystem } = JSON.parse(readFileSync(join(targetDir, '.stitch', 'design-system.json'), 'utf8'));
@@ -250,16 +255,34 @@ t('browser templates declare their Tailwind theme without CommonJS', () => {
   }
 });
 
-t('project export keeps CommonJS in its standalone Tailwind build config', () => {
-  const { files } = exportProject('minimal', 'mono', 'settings');
-  const html = files.find(({ path }) => path === 'index.html').content;
-  const code = files.find(({ path }) => path === 'tailwind.config.js').content;
-  assert.match(html, /href="dist\/output.css"/);
-  assert.doesNotMatch(html, /cdn\.tailwindcss\.com|tailwind\.config\s*=|module\.exports/);
-  const module = {};
-  runInNewContext(code, { module });
-  assert.equal(module.exports.theme.extend.colors.primary, '#404040');
-  assert.ok(module.exports.content.length > 0);
+t('project export keeps its CommonJS Tailwind config and covers every emitted HTML file', () => {
+  const targetDir = mkdtempSync(join(tmpdir(), 'phenotype-export-'));
+  try {
+    const { files } = callDesignerTool('export_project', {
+      style: 'minimal', palette: 'mono', archetype: 'settings', projectName: 'probe-export',
+    });
+    for (const { path, content } of files) {
+      const destination = join(targetDir, path);
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, content);
+    }
+
+    const html = readFileSync(join(targetDir, 'index.html'), 'utf8');
+    assert.match(html, /href="dist\/output.css"/);
+    assert.doesNotMatch(html, /cdn\.tailwindcss\.com|tailwind\.config\s*=|module\.exports/);
+    const config = createRequire(import.meta.url)(join(targetDir, 'tailwind.config.js'));
+    assert.equal(config.theme.extend.colors.primary, '#404040');
+
+    const htmlPaths = readdirSync(targetDir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+      .map((entry) => relative(targetDir, join(entry.parentPath, entry.name)).split(sep).join('/'));
+    assert.ok(htmlPaths.includes('index.html'));
+    const globs = config.content.map((glob) => glob.replace(/^\.\//, ''));
+    const uncovered = htmlPaths.filter((path) => !globs.some((glob) => posix.matchesGlob(path, glob)));
+    assert.deepEqual(uncovered, [], 'Exported HTML files missing from Tailwind content globs');
+  } finally {
+    rmSync(targetDir, { recursive: true, force: true });
+  }
 });
 
 console.log(`\n${n} phenotype fixes verified`);

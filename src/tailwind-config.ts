@@ -323,6 +323,7 @@ export function generateTailwindConfig(
 
   const config: TailwindConfig = {
     content: [
+      "./*.html",
       "./src/**/*.{html,js,ts,jsx,tsx}",
       "./pages/**/*.{html,js,ts,jsx,tsx}",
       "./components/**/*.{html,js,ts,jsx,tsx}",
