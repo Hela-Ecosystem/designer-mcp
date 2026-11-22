@@ -290,6 +290,14 @@ export const ARCHETYPES: Record<string, ArchetypeDef> = {
       "Treat whitespace as an active layout tool.",
     ],
   },
+  "awwwards-bento": {
+    label: "Awwwards Bento Showcase",
+    rules: [
+      "Use an asymmetric bento grid with oversized numbering and overlapping depth layers.",
+      "Let display typography, grain texture, and full-bleed anchors carry the composition.",
+      "Guard every kinetic reveal with prefers-reduced-motion.",
+    ],
+  },
 };
 
 export const HYBRIDS: Record<string, HybridDef> = {
@@ -388,8 +396,8 @@ export const CROSS_CUTTING = {
     label: "Motion & Animation",
     rules: [
       "Use motion as feedback, not decoration.",
-      "Standard transitions: 150-250ms with ease-out for entering, ease-in for exiting.",
-      "No animation longer than 500ms without a progress indicator.",
+      "Match duration to the style's calibrated preset; use ease-out for entering and ease-in for exiting.",
+      "Any motion that loops or runs long enough to wait on must expose progress or an intentional choreography cue.",
       "No flashing content (max 3 flashes per second).",
       "Always respect prefers-reduced-motion.",
     ],
@@ -398,7 +406,7 @@ export const CROSS_CUTTING = {
     label: "Design Tokens",
     rules: [
       "Use consistent spacing scale based on 4px increments.",
-      "Typography: max 4-5 size steps per system.",
+      "Typography: use the token scale's size steps and do not add ad-hoc sizes between them.",
       "Border radius: pick 2-3 values max (sm, md, lg) and reuse.",
       "Shadows: use sparingly, prefer surface elevation via color shift.",
       "Z-index: use a scale, not ad-hoc values.",

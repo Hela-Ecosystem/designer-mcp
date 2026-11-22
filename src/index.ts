@@ -60,9 +60,17 @@ import { scanProject } from "./preflight.js";
 import {
   runSlopTest,
   selfCritique,
+  SLOP_GATE_COUNT,
+  QUALITY_AXIS_COUNT,
   type SlopTestResult,
   type QualityScore,
 } from "./anti-patterns.js";
+import { BRAND_CATALOG, summarizeBrandCatalog } from "./brands.js";
+import {
+  PALETTE_ACTIONS,
+  DESIGN_AUDIT_ACTIONS,
+  MOTION_ENGINES,
+} from "./actions.js";
 import {
   appendWarning,
   textResult,
@@ -81,6 +89,9 @@ import {
 } from "./tokens.js";
 import {
   generate8StateWrapperHtml,
+  ALL_8_STATES,
+  COMPONENT_KINDS,
+  COMPONENT_STATE_COUNT,
   type ComponentKind,
 } from "./components-8state.js";
 import {
@@ -92,11 +103,17 @@ import {
   generateMotionDevSnippet,
   type MotionFramework,
 } from "./motion-dev.js";
-import { auditA11y } from "./a11y-audit.js";
-import { generateCSSOutput, type CSSOutputFormat } from "./css-output.js";
+import { auditA11y, A11Y_CHECK_COUNT } from "./a11y-audit.js";
+import {
+  generateCSSOutput,
+  CSS_OUTPUT_FORMATS,
+  type CSSOutputFormat,
+} from "./css-output.js";
 import {
   LOGO_LIBRARY_FORMAT_DESCRIPTION,
   LOGO_LIBRARY_QUERY_DESCRIPTION,
+  LOGO_ACTIONS,
+  logoLibraryMarkCount,
   logoSkillAvailable,
   logoSkillRoot,
   auditLogo,
@@ -252,89 +269,25 @@ function detectInstalledSkills(): Array<{
   return skills;
 }
 
-const BRAND_CATALOG: Record<string, string[]> = {
-  "productivity-saas": [
-    "notion",
-    "airtable",
-    "cal",
-    "superhuman",
-    "miro",
-    "intercom",
-    "zapier",
-    "linear.app",
-  ],
-  "developer-tools": [
-    "vercel",
-    "supabase",
-    "cursor",
-    "raycast",
-    "warp",
-    "posthog",
-    "sentry",
-    "hashicorp",
-    "expo",
-    "sanity",
-    "mintlify",
-    "framer",
-    "figma",
-    "webflow",
-    "clickhouse",
-    "mongodb",
-    "ibm",
-    "opencode.ai",
-  ],
-  "ai-ml": [
-    "claude",
-    "cohere",
-    "mistral.ai",
-    "x.ai",
-    "minimax",
-    "replicate",
-    "runwayml",
-    "elevenlabs",
-    "together.ai",
-    "ollama",
-    "composio",
-  ],
-  fintech: [
-    "stripe",
-    "coinbase",
-    "binance",
-    "kraken",
-    "revolut",
-    "wise",
-    "mastercard",
-  ],
-  "design-creative": [
-    "figma",
-    "framer",
-    "clay",
-    "lovable",
-    "webflow",
-    "linear.app",
-  ],
-  ecommerce: ["shopify", "nike", "starbucks"],
-  "media-consumer": [
-    "spotify",
-    "discord",
-    "slack",
-    "pinterest",
-    "theverge",
-    "wired",
-  ],
-  "automotive-luxury": [
-    "tesla",
-    "spacex",
-    "ferrari",
-    "bugatti",
-    "lamborghini",
-    "bmw",
-    "bmw-m",
-    "renault",
-    "vodafone",
-  ],
-  "legacy-archival": ["apple", "dell-1996", "hp", "nintendo-2001"],
-};
+const STYLE_SLUGS = Object.keys(STYLES);
+const PALETTE_SLUGS = Object.keys(PALETTES);
+const ARCHETYPE_SLUGS = Object.keys(ARCHETYPES);
+const CROSS_CUTTING_SLUGS = Object.keys(CROSS_CUTTING);
+const BRAND_CATEGORY_SLUGS = Object.keys(BRAND_CATALOG);
+const BRAND_SUMMARY = summarizeBrandCatalog(BRAND_CATALOG);
+const BRAND_DESCRIPTION =
+  `${BRAND_SUMMARY.unique} unique brands across ${BRAND_SUMMARY.categories} categories, ` +
+  `${BRAND_SUMMARY.listings} listings`;
+
+function ellisDesignNames(): string[] {
+  const ellisPath = join(MCP_ROOT, "examples", "ellis-ui");
+  if (!existsSync(ellisPath)) return [];
+  return readdirSync(ellisPath, { withFileTypes: true })
+    .filter(
+      (dirent) => dirent.isDirectory() && dirent.name.startsWith("backup_"),
+    )
+    .map((dirent) => dirent.name);
+}
 
 function runCommand(cmd: string, args: string[], cwd?: string): string {
   const result = spawnSync(cmd, args, {
@@ -367,16 +320,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           style: {
             type: "string",
             description:
-              "Design system: ant|carbon|fluent|atlassian|apple-hig|polaris|material|minimal|glass|neumorphism|neo-brutalism|claymorphism|skeuomorphism|swiss|swiss-archival|m3-pastel|neo-m3",
+              `Design system: ${STYLE_SLUGS.join("|")}`,
           },
           palette: {
             type: "string",
-            description: "Color palette: pastel|dark|vibrant|mono",
+            description: `Color palette: ${PALETTE_SLUGS.join("|")}`,
           },
           archetype: {
             type: "string",
             description:
-              "Optional page archetype: dashboard|settings|table-detail|marketing-hero|editorial-landing",
+              `Optional page archetype: ${ARCHETYPE_SLUGS.join("|")}`,
           },
           hybrid: {
             type: "string",
@@ -434,7 +387,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           action: {
             type: "string",
-            enum: ["fetch", "convert", "variants"],
+            enum: PALETTE_ACTIONS,
             description: "Palette operation",
           },
           mode: {
@@ -547,12 +500,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           palette: {
             type: "string",
-            enum: ["pastel", "dark", "vibrant", "mono"],
+            enum: PALETTE_SLUGS,
             description: "Color palette for css/tailwind actions",
           },
           format: {
             type: "string",
-            enum: ["vanilla", "css-modules", "scss", "css-variables-only"],
+            enum: CSS_OUTPUT_FORMATS,
             description: "Output format for css action",
           },
         },
@@ -569,16 +522,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           style: {
             type: "string",
             description:
-              "Design system: ant|carbon|fluent|atlassian|apple-hig|polaris|material|minimal|glass|neumorphism|neo-brutalism|claymorphism|skeuomorphism|swiss|swiss-archival|m3-pastel|neo-m3",
+              `Design system: ${STYLE_SLUGS.join("|")}`,
           },
           palette: {
             type: "string",
-            description: "Color palette: pastel|dark|vibrant|mono",
+            description: `Color palette: ${PALETTE_SLUGS.join("|")}`,
           },
           archetype: {
             type: "string",
             description:
-              "Page archetype: dashboard|settings|table-detail|marketing-hero|editorial-landing",
+              `Page archetype: ${ARCHETYPE_SLUGS.join("|")}`,
           },
         },
         required: ["style", "palette", "archetype"],
@@ -593,29 +546,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           component: {
             type: "string",
-            enum: [
-              "button",
-              "card",
-              "navbar",
-              "hero",
-              "form-input",
-              "badge",
-              "modal",
-              "sidebar",
-              "table",
-              "footer",
-              "chart",
-            ],
+            enum: COMPONENT_TYPES,
             description: "Component type",
           },
           style: {
             type: "string",
             description:
-              "Design system: ant|carbon|fluent|atlassian|apple-hig|polaris|material|minimal|glass|neumorphism|neo-brutalism|claymorphism|skeuomorphism|swiss|swiss-archival|m3-pastel|neo-m3",
+              `Design system: ${STYLE_SLUGS.join("|")}`,
           },
           framework: {
             type: "string",
-            enum: ["html", "react", "vue"],
+            enum: OUTPUT_FRAMEWORKS,
             description:
               "Output framework (default: html). 'react' returns a TypeScript FC with typed props. 'vue' returns a Vue 3 SFC with script setup.",
           },
@@ -631,13 +572,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "design_audit",
       description:
-        "Audit design work. Select action: accessibility (25-check WCAG 2.1), slop (35-gate anti-pattern check), critique (6-axis quality score), or preflight (scan an existing project's design tokens and stack).",
+        `Audit design work. Select action: accessibility (${A11Y_CHECK_COUNT}-check WCAG 2.1), slop (${SLOP_GATE_COUNT}-gate anti-pattern check), critique (${QUALITY_AXIS_COUNT}-axis quality score), or preflight (scan an existing project's design tokens and stack).`,
       inputSchema: {
         type: "object",
         properties: {
           action: {
             type: "string",
-            enum: ["accessibility", "slop", "critique", "preflight"],
+            enum: DESIGN_AUDIT_ACTIONS,
             description: "Audit mode",
           },
           html: {
@@ -650,7 +591,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           genre: {
             type: "string",
-            enum: ["editorial", "modern-minimal", "atmospheric", "playful"],
+            enum: listGenres(),
             default: "editorial",
             description: "Genre for scoped slop gates",
           },
@@ -665,20 +606,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "get_cross_cutting_rules",
       description:
-        "Get standalone cross-cutting design rules by category. Categories: icons, accessibility, motion, tokens, responsive, tailwind. Returns the rules as a formatted string.",
+        `Get standalone cross-cutting design rules by category. Categories: ${CROSS_CUTTING_SLUGS.join(", ")}. Returns the rules as a formatted string.`,
       inputSchema: {
         type: "object",
         properties: {
           category: {
             type: "string",
-            enum: [
-              "icons",
-              "accessibility",
-              "motion",
-              "tokens",
-              "responsive",
-              "tailwind",
-            ],
+            enum: CROSS_CUTTING_SLUGS,
             description: "Cross-cutting rule category",
           },
         },
@@ -695,16 +629,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           style: {
             type: "string",
             description:
-              "Design system: ant|carbon|fluent|atlassian|apple-hig|polaris|material|minimal|glass|neumorphism|neo-brutalism|claymorphism|skeuomorphism|swiss|swiss-archival|m3-pastel|neo-m3",
+              `Design system: ${STYLE_SLUGS.join("|")}`,
           },
           palette: {
             type: "string",
-            description: "Color palette: pastel|dark|vibrant|mono",
+            description: `Color palette: ${PALETTE_SLUGS.join("|")}`,
           },
           archetype: {
             type: "string",
             description:
-              "Page archetype: dashboard|settings|table-detail|marketing-hero|editorial-landing",
+              `Page archetype: ${ARCHETYPE_SLUGS.join("|")}`,
           },
           projectName: {
             type: "string",
@@ -739,14 +673,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "brand_list",
       description:
-        "List the curated local brand catalog (62 brands across 7 categories) grouped by category. For DESIGN.md retrieval beyond this list, use brand_fetch_design_md, which resolves the full 328+ brand getdesign catalog.",
+        `List the curated local brand catalog (${BRAND_DESCRIPTION}) grouped by category. For DESIGN.md retrieval beyond this list, use brand_fetch_design_md, which resolves the getdesign catalog.`,
       inputSchema: {
         type: "object",
         properties: {
           category: {
             type: "string",
             description:
-              "Optional category filter: productivity-saas|developer-tools|ai-ml|fintech|design-creative|ecommerce|media-consumer|automotive-luxury|legacy-archival",
+              `Optional category filter: ${BRAND_CATEGORY_SLUGS.join("|")}`,
           },
         },
       },
@@ -784,13 +718,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "generate_8state_component",
       description:
-        "Generate a complete 8-state component demo page (default, hover, focus, active, disabled, loading, error, success) for a given component kind. Returns a standalone HTML preview file with all states rendered.",
+        `Generate a complete ${COMPONENT_STATE_COUNT}-state component demo page (${ALL_8_STATES.map((state) => state.name).join(", ")}) for a given component kind. Returns a standalone HTML preview file with all states rendered.`,
       inputSchema: {
         type: "object",
         properties: {
           kind: {
             type: "string",
-            enum: ["button", "input", "toggle", "chip", "select"],
+            enum: COMPONENT_KINDS,
             description: "Component kind",
           },
         },
@@ -800,7 +734,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "list_ellis_ui_designs",
       description:
-        "List all 24 bespoke Ellis UI component design templates with their specific aesthetic focus.",
+        `List all ${ellisDesignNames().length} bespoke Ellis UI component design templates with their specific aesthetic focus.`,
       inputSchema: { type: "object", properties: {} },
     },
     {
@@ -822,22 +756,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "logo_workflow",
       description:
-        "Logo-design workflow. Select action: audit, search, renderers, render, export_variants, concept_sheet, preview_sheet, or presentation_board. Search queries the 1,400+ mark library; render/export/board actions write files.",
+        `Logo-design workflow. Select action: ${LOGO_ACTIONS.join(", ")}. Search queries the ${logoLibraryMarkCount().toLocaleString("en-US")}-mark library; render/export/board actions write files.`,
       inputSchema: {
         type: "object",
         properties: {
           action: {
             type: "string",
-            enum: [
-              "audit",
-              "search",
-              "renderers",
-              "render",
-              "export_variants",
-              "concept_sheet",
-              "preview_sheet",
-              "presentation_board",
-            ],
+            enum: LOGO_ACTIONS,
             description: "Logo workflow step",
           },
           files: {
@@ -948,22 +873,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "generate_motion_snippet",
       description:
-        "Generate a ready-to-paste anime.js v3 animation snippet for a given motion category and design style. Returns CDN link, code snippet, usage hint, and reduced-motion note. Categories: entrance, micro, stagger, scroll, loader, transition, counter, typewriter. All snippets include prefers-reduced-motion guards.",
+        `Generate a ready-to-paste anime.js v3 animation snippet for a given motion category and design style. Returns CDN link, code snippet, usage hint, and reduced-motion note. Categories: ${MOTION_CATEGORIES.join(", ")}. All snippets include prefers-reduced-motion guards.`,
       inputSchema: {
         type: "object",
         properties: {
           category: {
             type: "string",
-            enum: [
-              "entrance",
-              "micro",
-              "stagger",
-              "scroll",
-              "loader",
-              "transition",
-              "counter",
-              "typewriter",
-            ],
+            enum: MOTION_CATEGORIES,
             description:
               "Animation category: entrance=page load, micro=button/chip interactions, stagger=list/grid reveal, scroll=IntersectionObserver-triggered, loader=spinner, transition=page transitions, counter=number counters, typewriter=text reveal",
           },
@@ -974,12 +890,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           engine: {
             type: "string",
-            enum: ["animejs", "motion.dev"],
+            enum: MOTION_ENGINES,
             description: "Animation engine to use. Defaults to motion.dev.",
           },
           framework: {
             type: "string",
-            enum: ["html", "react", "vue"],
+            enum: OUTPUT_FRAMEWORKS,
             description:
               "Target framework (used by motion.dev engine). Defaults to react.",
           },
@@ -1179,7 +1095,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "stitch_screen_audit",
       description:
-        "Run a unified audit on a Stitch-captured HTML screen or file. Executes 25-check WCAG 2.1 static analysis, 35+ gate anti-slop checks, and 6-axis craft critique.",
+        `Run a unified audit on a Stitch-captured HTML screen or file. Executes ${A11Y_CHECK_COUNT}-check WCAG 2.1 static analysis, ${SLOP_GATE_COUNT}-gate anti-slop checks, and ${QUALITY_AXIS_COUNT}-axis craft critique.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -1275,12 +1191,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             `Ellis UI examples directory not found at ${ellisPath}`,
           );
         }
-        const dirs = readdirSync(ellisPath, { withFileTypes: true })
-          .filter(
-            (dirent) =>
-              dirent.isDirectory() && dirent.name.startsWith("backup_"),
-          )
-          .map((dirent) => dirent.name);
+        const dirs = ellisDesignNames();
 
         let output = "Available Ellis UI Templates:\\n";
         for (const d of dirs) {
@@ -1352,8 +1263,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           extension: ".md",
         });
         if (!existsSync(refPath)) {
+          const available = readdirSync(refsDir)
+            .filter((file: string) => file.endsWith(".md"))
+            .map((file: string) => file.slice(0, -3))
+            .sort();
           throw new Error(
-            `Reference not found: ${refName}. Available references are in ${refsDir}/`,
+            `Reference not found: ${refName}. Available references: ${
+              available.length ? available.join(", ") : "(none installed)"
+            }`,
           );
         }
         const content = readFileSync(refPath, "utf8");
@@ -1662,20 +1579,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return textResult(name, JSON.stringify(result, null, 2));
         }
         if (action === "css") {
-          const CSS_FORMATS: CSSOutputFormat[] = [
-            "vanilla",
-            "css-modules",
-            "scss",
-            "css-variables-only",
-          ];
           const { style, palette, format } = args as {
             style: string;
             palette: string;
             format: string;
           };
-          if (!CSS_FORMATS.includes(format as CSSOutputFormat)) {
+          if (!CSS_OUTPUT_FORMATS.includes(format as CSSOutputFormat)) {
             throw new Error(
-              `Unknown format: ${format}. Available: ${CSS_FORMATS.join(", ")}`,
+              `Unknown format: ${format}. Available: ${CSS_OUTPUT_FORMATS.join(", ")}`,
             );
           }
           const result = generateCSSOutput(

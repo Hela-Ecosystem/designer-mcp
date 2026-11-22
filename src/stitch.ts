@@ -8,7 +8,7 @@
  *    dedicated stitch MCP server.
  * 2. Two Phenotype-native bridge tools:
  *    - stitch_sync_design_system (converts OKLCH tokens & design rules into Stitch DESIGN.md & design-system JSON)
- *    - stitch_screen_audit (audits Stitch-captured screens with WCAG 2.1, 35 anti-slop gates & 6-axis craft critique)
+ *    - stitch_screen_audit (audits Stitch-captured screens with WCAG 2.1, the anti-slop gate suite and craft critique)
  */
 
 import { spawn } from "node:child_process";

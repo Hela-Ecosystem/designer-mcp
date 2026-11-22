@@ -805,6 +805,8 @@ const ALL_CHECKS: Array<{ name: string; fn: CheckFn }> = [
   { name: "color-contrast-inline", fn: checkColorContrastInline },
 ];
 
+export const A11Y_CHECK_COUNT = ALL_CHECKS.length;
+
 // ---------------------------------------------------------------------------
 // Scoring
 // ---------------------------------------------------------------------------

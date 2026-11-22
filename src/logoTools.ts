@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
@@ -10,6 +10,26 @@ export const LOGO_SKILL_PATH =
   join(__dirname, "..", "skills", "logo-design");
 
 const SCRIPTS = join(LOGO_SKILL_PATH, "scripts");
+
+export const LOGO_ACTIONS = [
+  "audit",
+  "search",
+  "renderers",
+  "render",
+  "export_variants",
+  "concept_sheet",
+  "preview_sheet",
+  "presentation_board",
+] as const;
+
+export type LogoAction = (typeof LOGO_ACTIONS)[number];
+
+/** Number of SVGs shipped in the skill's reference library (0 when absent). */
+export function logoLibraryMarkCount(): number {
+  const dir = join(LOGO_SKILL_PATH, "assets", "library", "svg");
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).filter((f) => f.endsWith(".svg")).length;
+}
 
 /** Upstream scripts: audience-visible renderers vs fast pure-analysis ones. */
 const SLOW_SCRIPTS = new Set([
@@ -524,7 +544,7 @@ export function logoToolSchemas() {
     {
       name: "logo_search_library",
       description:
-        "Search the library of 1,400+ real-world SVG logos by mark type, technique, geometry, subject, industry, colour, mood, type style and more. Use --summary semantics (summary=true) to learn a category's conventions, format='paths' to get files to open.",
+        `Search the library of ${logoLibraryMarkCount().toLocaleString("en-US")} real-world SVG logos by mark type, technique, geometry, subject, industry, colour, mood, type style and more. Use --summary semantics (summary=true) to learn a category's conventions, format='paths' to get files to open.`,
       inputSchema: {
         type: "object",
         properties: {

@@ -7,7 +7,7 @@ import { generateMotionSnippet, MOTION_CATEGORIES } from '../dist/anime-motion.j
 import { generateMotionDevSnippet } from '../dist/motion-dev.js';
 import { getComponent, COMPONENT_TYPES } from '../dist/components.js';
 import { generateTemplate } from '../dist/templates.js';
-import { runSlopTest, selfCritique } from '../dist/anti-patterns.js';
+import { runSlopTest, selfCritique, countSlopGates } from '../dist/anti-patterns.js';
 
 test('Awwwards Rules: awwwards style is registered with SOTA guidelines', () => {
   assert.ok(STYLES.awwwards);
@@ -129,7 +129,7 @@ test('Awwwards Template: generateTemplate with bento-showcase archetype', () => 
 test('Awwwards Anti-Slop: gate 57, gate 58 and selfCritique scoring', () => {
   const template = generateTemplate('awwwards', 'obsidian-noir', 'awwwards-bento');
   const slopRes = runSlopTest(template, 'avant-garde');
-  assert.ok(slopRes.total >= 35);
+  assert.equal(slopRes.total, countSlopGates('avant-garde'));
   assert.ok(slopRes.gates.some((g) => g.id === 57 && g.pass));
   assert.ok(slopRes.gates.some((g) => g.id === 58 && g.pass));
 

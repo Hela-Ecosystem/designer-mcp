@@ -384,18 +384,23 @@ export function pickTheme(
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+const TEXT_SCALE: Record<string, string> = {
+  display: "clamp(2.5rem, 6vw, 4.5rem)",
+  "display-s": "clamp(2rem, 4vw, 3rem)",
+  "2xl": "1.75rem",
+  xl: "1.25rem",
+  lg: "1.125rem",
+  base: "1rem",
+  sm: "0.875rem",
+  xs: "0.75rem",
+};
+
+export const TEXT_STEP_NAMES = Object.keys(TEXT_SCALE);
+export const TEXT_STEP_COUNT = TEXT_STEP_NAMES.length;
+
 function generateThemeTokens(theme: TokenTheme): TokenSet {
   const scale = [4, 8, 12, 16, 24, 32, 48, 64, 96, 128];
-  const textScale = {
-    display: "clamp(2.5rem, 6vw, 4.5rem)",
-    "display-s": "clamp(2rem, 4vw, 3rem)",
-    "2xl": "1.75rem",
-    xl: "1.25rem",
-    lg: "1.125rem",
-    base: "1rem",
-    sm: "0.875rem",
-    xs: "0.75rem",
-  };
+  const textScale = TEXT_SCALE;
 
   const paperLight =
     theme.paper.l > 50

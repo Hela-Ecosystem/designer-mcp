@@ -14,6 +14,7 @@ import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
 import {
+  LOGO_ACTIONS,
   LOGO_SKILL_PATH,
   logoSkillAvailable,
   logoSkillRoot,
@@ -119,9 +120,9 @@ t("skill root is an absolute path", () => {
 
 /* ---------- schemas ---------- */
 
-t("8 logo tools are exposed with required args", () => {
+t("logo tools are exposed with required args", () => {
   const schemas = logoToolSchemas();
-  assert.equal(schemas.length, 8);
+  assert.equal(schemas.length, LOGO_ACTIONS.length);
   const byName = Object.fromEntries(schemas.map((s) => [s.name, s]));
   assert.deepEqual([...Object.keys(byName)].sort(), [
     "logo_audit",

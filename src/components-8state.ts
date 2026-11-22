@@ -58,7 +58,17 @@ export const ALL_8_STATES: ComponentState[] = [
   },
 ];
 
+export const COMPONENT_STATE_COUNT = ALL_8_STATES.length;
+
 export type ComponentKind = "button" | "input" | "toggle" | "chip" | "select";
+
+export const COMPONENT_KINDS: ComponentKind[] = [
+  "button",
+  "input",
+  "toggle",
+  "chip",
+  "select",
+];
 
 interface Component8StateTemplate {
   html: string;
@@ -137,7 +147,7 @@ function generate8StatesComponent(
   });
 
   const html = `<div class="eight-state-demo">
-  <h2 class="demo-title">${kind.charAt(0).toUpperCase() + kind.slice(1)} \u2014 8 states</h2>
+  <h2 class="demo-title">${kind.charAt(0).toUpperCase() + kind.slice(1)} \u2014 ${COMPONENT_STATE_COUNT} states</h2>
 ${stateRows.join("\n")}
 </div>`;
 

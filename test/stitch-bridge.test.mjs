@@ -12,6 +12,7 @@ import {
   stitchSyncDesignSystem,
   stitchScreenAudit,
 } from '../dist/stitch.js';
+import { countSlopGates } from '../dist/anti-patterns.js';
 
 test('Stitch Bridge: detects local stitch CLI binary when installed', (t) => {
   const cli = findStitchCli();
@@ -92,7 +93,7 @@ test('Stitch Bridge: stitchScreenAudit audits HTML with WCAG, anti-slop, and cra
   assert.ok(report.accessibility);
   assert.ok(report.accessibility.score >= 0);
   assert.ok(report.antiSlop);
-  assert.ok(report.antiSlop.totalGates >= 35);
+  assert.equal(report.antiSlop.totalGates, countSlopGates('avant-garde'));
   assert.ok(report.craftQuality);
   assert.ok(report.craftQuality.hierarchy >= 3);
 });

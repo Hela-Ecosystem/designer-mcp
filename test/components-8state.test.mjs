@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { generate8StateWrapperHtml } from '../dist/components-8state.js';
+import {
+  COMPONENT_KINDS,
+  COMPONENT_STATE_COUNT,
+  generate8StateWrapperHtml,
+} from '../dist/components-8state.js';
 
-const kinds = ['button', 'input', 'toggle', 'chip', 'select'];
+const kinds = COMPONENT_KINDS;
 const toggleHtml = generate8StateWrapperHtml('toggle');
 
 test('state classes share a single class attribute with the base class for every kind', () => {
@@ -25,8 +29,8 @@ test('state classes share a single class attribute with the base class for every
 test('the eight toggle rows have distinct non-text signatures', () => {
   const controls = [...toggleHtml.matchAll(/<div class="demo-component">(<label class="toggle">.*?<\/label>)/g)]
     .map(([, control]) => control);
-  assert.equal(controls.length, 8);
-  assert.equal(new Set(controls.map((control) => control.replace(/>[^<]+</g, '><'))).size, 8);
+  assert.equal(controls.length, COMPONENT_STATE_COUNT);
+  assert.equal(new Set(controls.map((control) => control.replace(/>[^<]+</g, '><'))).size, COMPONENT_STATE_COUNT);
 
   const [defaults, hover, focus, active, disabled, loading, error, success] = controls;
   for (const control of controls) {

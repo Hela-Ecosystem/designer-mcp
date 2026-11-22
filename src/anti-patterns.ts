@@ -607,12 +607,28 @@ const ALL_GATES: SlopGate[] = [
   },
 ];
 
+export const SLOP_GATE_COUNT = ALL_GATES.length;
+
+export const QUALITY_AXES = [
+  "philosophy",
+  "hierarchy",
+  "execution",
+  "specificity",
+  "restraint",
+  "variety",
+] as const;
+export const QUALITY_AXIS_COUNT = QUALITY_AXES.length;
+
 function applyGenreOverrides(gates: SlopGate[], genre: string): SlopGate[] {
   return gates.filter((g) => {
     if (!g.scoped) return true;
     if (g.scoped === genre) return true;
     return false;
   });
+}
+
+export function countSlopGates(genre = "editorial"): number {
+  return applyGenreOverrides(ALL_GATES, genre).length;
 }
 
 export function runSlopTest(

@@ -1,6 +1,6 @@
 # HeLa Phenotype: canonical tools
 
-Server version **3.2.1**. Generated from the ecosystem schema catalog; regenerate with `npm run docs:generate -- --servers` in the ecosystem checkout.
+Server version **3.2.1**. Generated from the live `tools/list` registry; regenerate with `npm run docs:generate`.
 
 Only names advertised by `tools/list` are listed here. Older aliases in migration examples are not additional tools. Runtime namespace prefixes are optional and do not change these server-local names.
 
@@ -10,11 +10,11 @@ Download and return the DESIGN.md for a real brand (stripe, vercel, linear, noti
 
 ## `brand_list`
 
-List the curated local brand catalog (62 brands across 7 categories) grouped by category. For DESIGN.md retrieval beyond this list, use brand_fetch_design_md, which resolves the full 328+ brand getdesign catalog.
+List the curated local brand catalog (68 unique brands across 9 categories, 72 listings) grouped by category. For DESIGN.md retrieval beyond this list, use brand_fetch_design_md, which resolves the getdesign catalog.
 
 ## `design_audit`
 
-Audit design work. Select action: accessibility (25-check WCAG 2.1), slop (35-gate anti-pattern check), critique (6-axis quality score), or preflight (scan an existing project's design tokens and stack).
+Audit design work. Select action: accessibility (25-check WCAG 2.1), slop (37-gate anti-pattern check), critique (6-axis quality score), or preflight (scan an existing project's design tokens and stack).
 
 Actions: `accessibility`, `slop`, `critique`, `preflight`.
 
@@ -26,7 +26,7 @@ Actions: `theme`, `custom`, `css`, `tailwind`.
 
 ## `detect_genre`
 
-Detect the most appropriate design genre from a product description or brief. Returns one of: editorial, modern-minimal, atmospheric, playful.
+Detect the most appropriate design genre from a product description or brief. Returns one of: editorial, modern-minimal, atmospheric, playful, avant-garde.
 
 ## `evaluate_style`
 
@@ -42,7 +42,7 @@ Generate a complete 8-state component demo page (default, hover, focus, active, 
 
 ## `generate_motion_snippet`
 
-Generate a ready-to-paste anime.js v3 animation snippet for a given motion category and design style. Returns CDN link, code snippet, usage hint, and reduced-motion note. Categories: entrance, micro, stagger, scroll, loader, transition, counter, typewriter. All snippets include prefers-reduced-motion guards.
+Generate a ready-to-paste anime.js v3 animation snippet for a given motion category and design style. Returns CDN link, code snippet, usage hint, and reduced-motion note. Categories: entrance, micro, stagger, scroll, loader, transition, counter, typewriter, magnetic, text-split, smooth-scroll, marquee, noise-grain, clip-path-mask. All snippets include prefers-reduced-motion guards.
 
 ## `generate_rules`
 
@@ -86,7 +86,7 @@ List all available named themes, optionally filtered by genre. Each theme includ
 
 ## `logo_workflow`
 
-Logo-design workflow. Select action: audit, search, renderers, render, export_variants, concept_sheet, preview_sheet, or presentation_board. Search queries the 1,400+ mark library; render/export/board actions write files.
+Logo-design workflow. Select action: audit, search, renderers, render, export_variants, concept_sheet, preview_sheet, presentation_board. Search queries the 1,432-mark library; render/export/board actions write files.
 
 Actions: `audit`, `search`, `renderers`, `render`, `export_variants`, `concept_sheet`, `preview_sheet`, `presentation_board`.
 
@@ -116,7 +116,7 @@ Actions: `get`, `edit`, `delete`, `url`.
 
 ## `stitch_screen_audit`
 
-Run a unified audit on a Stitch-captured HTML screen or file. Executes 25-check WCAG 2.1 static analysis, 35+ gate anti-slop checks, and 6-axis craft critique.
+Run a unified audit on a Stitch-captured HTML screen or file. Executes 25-check WCAG 2.1 static analysis, 37-gate anti-slop checks, and 6-axis craft critique.
 
 ## `stitch_sync_design_system`
 
