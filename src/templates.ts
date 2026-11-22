@@ -30,10 +30,14 @@ function tailwindFontFamily(style: string): string {
 }
 
 function shellStyle(style: string, palette: string): string {
-  const { code } = generateTailwindConfig(style, palette);
+  const { config: { theme } } = generateTailwindConfig(style, palette);
   const fontLine = tailwindFontFamily(style);
   const animeShell = buildAnimeShell(style);
-  return `<script src="https://cdn.tailwindcss.com"></script>\n<script>\n${code}\n</script>\n<style>\n  body { ${fontLine}; }\n  ${style === "glass" ? "body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }" : ""}\n  ${style === "neo-brutalism" ? ".neo-shadow { box-shadow: 4px 4px 0px rgba(0,0,0,1); }" : ""}\n  ${style === "neumorphism" ? ".neu-surface { background: #e2e8f0; box-shadow: 6px 6px 12px rgba(0,0,0,0.15), -6px -6px 12px rgba(255,255,255,0.7); }" : ""}\n  ${style === "claymorphism" ? ".clay-card { box-shadow: 4px 4px 8px rgba(0,0,0,0.10), inset 0 -4px 8px rgba(0,0,0,0.06); }" : ""}\n  ${style === "awwwards" ? "body { background: #08080a; color: #f4f4f5; } .awwwards-card { background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(24px); } .awwwards-card:hover { border-color: rgba(255,255,255,0.25); }" : ""}\n</style>\n${animeShell}`;
+  return `<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = ${JSON.stringify({ theme }, null, 2)};
+</script>
+<style>\n  body { ${fontLine}; }\n  ${style === "glass" ? "body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }" : ""}\n  ${style === "neo-brutalism" ? ".neo-shadow { box-shadow: 4px 4px 0px rgba(0,0,0,1); }" : ""}\n  ${style === "neumorphism" ? ".neu-surface { background: #e2e8f0; box-shadow: 6px 6px 12px rgba(0,0,0,0.15), -6px -6px 12px rgba(255,255,255,0.7); }" : ""}\n  ${style === "claymorphism" ? ".clay-card { box-shadow: 4px 4px 8px rgba(0,0,0,0.10), inset 0 -4px 8px rgba(0,0,0,0.06); }" : ""}\n  ${style === "awwwards" ? "body { background: #08080a; color: #f4f4f5; } .awwwards-card { background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(24px); } .awwwards-card:hover { border-color: rgba(255,255,255,0.25); }" : ""}\n</style>\n${animeShell}`;
 }
 
 function dashboardTemplate(style: string, palette: string): string {

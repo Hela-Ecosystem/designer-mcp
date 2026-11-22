@@ -4,10 +4,15 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { generatePaletteVariants } from '../dist/palette-variants.js';
 import { auditA11y } from '../dist/a11y-audit.js';
 import { buildCustomTokens, generateTokens, listThemes } from '../dist/tokens.js';
 import { isStitchCliTool, STITCH_CLI_TOOLS } from '../dist/stitch.js';
+import { exportProject } from '../dist/export.js';
+import { ARCHETYPES, PALETTES, STYLES } from '../dist/rules.js';
+import { generateTailwindConfig } from '../dist/tailwind-config.js';
+import { generateTemplate } from '../dist/templates.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log(`ok ${n} - ${name}`); };
@@ -215,6 +220,46 @@ t('stitch sync writes matching canvas and Markdown accents in sRGB', () => {
   } finally {
     rmSync(targetDir, { recursive: true, force: true });
   }
+});
+
+t('browser templates declare their Tailwind theme without CommonJS', () => {
+  const archetypes = [...Object.keys(ARCHETYPES), 'awwwards-bento'];
+  const externalScript = /\bsrc\s*=/i;
+  for (const style of Object.keys(STYLES)) {
+    for (const palette of Object.keys(PALETTES)) {
+      const { config: { theme } } = generateTailwindConfig(style, palette);
+      for (const archetype of archetypes) {
+        const label = `${style} / ${palette} / ${archetype}`;
+        const html = generateTemplate(style, palette, archetype);
+        const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+        for (const [, attributes, source] of scripts) {
+          if (!externalScript.test(attributes)) {
+            assert.doesNotMatch(source, /\bmodule\s*\.\s*exports\b|\brequire\s*\(/, label);
+          }
+        }
+        const cdnIndex = scripts.findIndex(([, attributes]) => attributes.includes('src="https://cdn.tailwindcss.com"'));
+        assert.ok(cdnIndex >= 0, `${label}: Tailwind Play CDN is missing`);
+        const [, configAttributes, configScript] = scripts[cdnIndex + 1] ?? [];
+        assert.doesNotMatch(configAttributes ?? '', externalScript, `${label}: config must be inline`);
+        assert.match(configScript ?? '', /\btailwind\.config\s*=/, `${label}: config assignment is missing`);
+        const tailwind = {};
+        runInNewContext(configScript, { tailwind });
+        assert.equal(JSON.stringify(tailwind.config), JSON.stringify({ theme }), label);
+      }
+    }
+  }
+});
+
+t('project export keeps CommonJS in its standalone Tailwind build config', () => {
+  const { files } = exportProject('minimal', 'mono', 'settings');
+  const html = files.find(({ path }) => path === 'index.html').content;
+  const code = files.find(({ path }) => path === 'tailwind.config.js').content;
+  assert.match(html, /href="dist\/output.css"/);
+  assert.doesNotMatch(html, /cdn\.tailwindcss\.com|tailwind\.config\s*=|module\.exports/);
+  const module = {};
+  runInNewContext(code, { module });
+  assert.equal(module.exports.theme.extend.colors.primary, '#404040');
+  assert.ok(module.exports.content.length > 0);
 });
 
 console.log(`\n${n} phenotype fixes verified`);
