@@ -2,6 +2,14 @@
 
 All notable changes to this project.
 
+## [3.2.2] - 2026-11-23
+
+### Fixed
+- Published counts and enums are derived from the live data instead of hand-written copies. The anti-slop test is 37 gates (was "35"), the brand catalogue summary is 68 unique brands in 9 categories over 72 listings (was "62 brands"), motion snippets expose 14 categories (was 8), the theme catalogue is 19, the design systems are 18, and the README tool count follows `tools/list`. (`designer-mcp#45`)
+- Two rules that contradicted the code are gone: "max 4-5 size steps" (the tokens emit 8) and "no animation longer than 500ms" (presets deliberately exceed it).
+- `get_reference` no longer returns the server absolute reference path; it lists the available reference names.
+- A consistency test spawns the built server, reads the live catalogues, and fails when a published number, enum or list disagrees. Counts that cannot be derived (the getdesign catalogue size, the host-dependent advertised tool count) are not claimed.
+
 ## [3.2.1] - 2026-11-22
 
 ### Fixed

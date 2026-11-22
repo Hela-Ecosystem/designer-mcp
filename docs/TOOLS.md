@@ -1,6 +1,6 @@
 # HeLa Phenotype: canonical tools
 
-Server version **3.2.1**. Generated from the live `tools/list` registry; regenerate with `npm run docs:generate`.
+Server version **3.2.2**. Generated from the live `tools/list` registry; regenerate with `npm run docs:generate`.
 
 Only names advertised by `tools/list` are listed here. Older aliases in migration examples are not additional tools. Runtime namespace prefixes are optional and do not change these server-local names.
 
