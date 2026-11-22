@@ -505,12 +505,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           theme_name: {
             type: "string",
-            description:
-              "Named theme for theme action: Specimen|Atelier|Newsprint|Studio|Manifesto|Brutal|Terminal|Midnight|Bloom|Aurora|Cobalt|Coral|Hum|Garden|Sport|Carnival",
+            description: `Named theme for theme action: ${listThemes().map(({ name }) => name).join("|")}`,
           },
           genre: {
             type: "string",
-            enum: ["editorial", "modern-minimal", "atmospheric", "playful"],
+            enum: listGenres(),
             description: "Genre for theme action (ignored if theme_name is set)",
           },
           last_theme: {
@@ -754,7 +753,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           genre: {
             type: "string",
-            enum: ["editorial", "modern-minimal", "atmospheric", "playful"],
+            enum: listGenres(),
             description: "Optional genre filter",
           },
         },
@@ -763,7 +762,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "detect_genre",
       description:
-        "Detect the most appropriate design genre from a product description or brief. Returns one of: editorial, modern-minimal, atmospheric, playful.",
+        `Detect the most appropriate design genre from a product description or brief. Returns one of: ${listGenres().join(", ")}.`,
       inputSchema: {
         type: "object",
         properties: {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { generatePaletteVariants } from '../dist/palette-variants.js';
 import { auditA11y } from '../dist/a11y-audit.js';
-import { buildCustomTokens } from '../dist/tokens.js';
+import { buildCustomTokens, generateTokens, listThemes } from '../dist/tokens.js';
 import { isStitchCliTool, STITCH_CLI_TOOLS } from '../dist/stitch.js';
 
 let n = 0;
@@ -85,6 +85,42 @@ t('focus token is clamped into the sRGB gamut', () => {
     assert.ok(focus.c < 0.28, `focus chroma not reduced: ${focus.c}`);
     const rgb = oklchToLinearSrgb(focus.l, focus.c, focus.h);
     assert.ok(rgb.every((v) => v >= -0.002 && v <= 1.002), `out of gamut: ${JSON.stringify(rgb)}`);
+  }
+});
+
+// #40 — catalogue colours fit sRGB before token generation
+t('all stored theme colours are inside the sRGB gamut', () => {
+  const epsilon = 1e-6;
+  const outOfGamut = [];
+  const themes = listThemes();
+  assert.ok(themes.length > 0, 'theme catalogue is empty');
+  for (const theme of themes) {
+    for (const key of ['paper', 'accent']) {
+      const { l, c, h } = theme[key];
+      const rgb = oklchToLinearSrgb(l, c / 100, h);
+      if (!rgb.every((channel) => channel >= -epsilon && channel <= 1 + epsilon)) {
+        outOfGamut.push(`${theme.name} ${key}: ${rgb.join(', ')}`);
+      }
+    }
+  }
+  assert.deepEqual(outOfGamut, []);
+});
+
+t('named tokens emit catalogue colours and keep focus within the sRGB tolerance', () => {
+  for (const theme of listThemes()) {
+    const { tokens, dark_tokens: counterpart } = generateTokens(theme.name);
+    for (const key of ['paper', 'accent']) {
+      const { l, c, h } = theme[key];
+      assert.equal(tokens.colors[`--color-${key}`], `oklch(${l}% ${(c / 100).toFixed(3)} ${h})`,
+        `${theme.name} ${key}`);
+    }
+    for (const set of [tokens, counterpart]) {
+      const { l, c, h } = parseOklch(set.colors['--color-focus']);
+      const rgb = oklchToLinearSrgb(l, c, h);
+      assert.equal(h, theme.accent.h, theme.name);
+      assert.ok(rgb.every((channel) => channel >= -0.002 && channel <= 1.002),
+        `${theme.name} focus out of gamut: ${rgb.join(', ')}`);
+    }
   }
 });
 
