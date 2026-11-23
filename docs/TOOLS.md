@@ -1,6 +1,6 @@
 # HeLa Phenotype: canonical tools
 
-Server version **3.2.3**. Generated from the ecosystem schema catalog; regenerate with `npm run docs:generate -- --servers` in the ecosystem checkout.
+Server version **3.3.0**. Generated from the ecosystem schema catalog; regenerate with `npm run docs:generate -- --servers` in the ecosystem checkout.
 
 Only names advertised by `tools/list` are listed here. Older aliases in migration examples are not additional tools. Runtime namespace prefixes are optional and do not change these server-local names.
 
@@ -62,7 +62,7 @@ Get standalone cross-cutting design rules by category. Categories: icons, access
 
 ## `get_ellis_ui_template`
 
-Fetch the HTML structure and CSS logic of a specific Ellis UI design system (e.g., 'backup_dossier' or 'backup_gameboy'). Returns both the design.md guidelines and the root index.html template.
+Fetch a complete Ellis UI design system (e.g. 'backup_dossier' or 'backup_gameboy'): design.md plus every HTML page (index, letter, note, slideshow). Pass page to fetch a single page instead.
 
 ## `get_reference`
 
@@ -70,7 +70,7 @@ Return the full content of a reference document by name (e.g. 'ant-design', 'acc
 
 ## `list_ellis_ui_designs`
 
-List all 24 bespoke Ellis UI component design templates with their specific aesthetic focus.
+List all 24 bespoke Ellis UI design templates as a compact index: name, title, concept, typography, palette, and available HTML pages. Use get_ellis_ui_template for the guidelines and page source.
 
 ## `list_installed_skills`
 
