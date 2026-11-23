@@ -2,6 +2,17 @@
 
 All notable changes to this project.
 
+## [3.3.0] - 2026-11-24
+
+### Added
+- `get_ellis_ui_template` returns the whole design system: `design.md` and all four HTML pages (`index.html`, `letter.html`, `note.html`, `slideshow.html`) instead of only the root index. An optional `page` argument returns a single page by filename; unknown names are rejected with the available list. (`designer-mcp#41`)
+- `list_ellis_ui_designs` returns a compact JSON index — name, title, concept, typography, palette and page names — instead of embedding the full `design.md` in every entry. The 24-template response drops from the full corpus to a scannable index. (`designer-mcp#41`)
+
+### Fixed
+- Both Ellis UI tools emitted literal `\n` two-character sequences instead of newlines. Output now contains real line breaks, and a parsing bug that turned each list title into the whole document is gone. (`designer-mcp#41`)
+- The templates no longer claim "Zero Dependencies". They use no JS framework, but every page loads the Tailwind Play CDN and Google Fonts and some hotlink icons; `design.md` and the README now say so and warn that the Play CDN is a development tool to compile away before shipping. (`designer-mcp#41`)
+- The personal Ellis letter copy is intentionally retained; these templates originated as a birthday project, and the showcase is part of their identity.
+
 ## [3.2.3] - 2026-11-23
 
 ### Fixed

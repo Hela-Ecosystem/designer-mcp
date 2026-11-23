@@ -27,7 +27,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { readFileSync, existsSync, mkdirSync, rmSync, readdirSync } from "fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+  readdirSync,
+  statSync,
+} from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";
@@ -287,6 +294,53 @@ function ellisDesignNames(): string[] {
       (dirent) => dirent.isDirectory() && dirent.name.startsWith("backup_"),
     )
     .map((dirent) => dirent.name);
+}
+
+interface EllisPage {
+  name: string;
+  bytes: number;
+}
+
+interface EllisDesignSummary {
+  name: string;
+  title: string;
+  concept: string;
+  typography: string;
+  palette: string;
+  pages: string[];
+}
+
+function ellisPages(designDir: string): EllisPage[] {
+  return readdirSync(designDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".html"))
+    .map((entry) => ({
+      name: entry.name,
+      bytes: statSync(join(designDir, entry.name)).size,
+    }))
+    .sort((a, b) =>
+      a.name === "index.html"
+        ? -1
+        : b.name === "index.html"
+          ? 1
+          : a.name.localeCompare(b.name),
+    );
+}
+
+function summarizeEllisDesign(
+  name: string,
+  designDir: string,
+): EllisDesignSummary {
+  const mdPath = join(designDir, "design.md");
+  const md = existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : "";
+  const field = (pattern: RegExp) => md.match(pattern)?.[1]?.trim() ?? "";
+  return {
+    name,
+    title: field(/^# Design System:\s*(.+)$/m) || name,
+    concept: field(/based on the concept of \*\*(.+?)\*\*/).replace(/\.$/, ""),
+    typography: field(/^\* \*\*Typography:\*\*\s*(.+)$/m),
+    palette: field(/^\* \*\*Color Palette:\*\*\s*(.+)$/m),
+    pages: ellisPages(designDir).map((page) => page.name),
+  };
 }
 
 function runCommand(cmd: string, args: string[], cwd?: string): string {
@@ -734,13 +788,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: "list_ellis_ui_designs",
       description:
-        `List all ${ellisDesignNames().length} bespoke Ellis UI component design templates with their specific aesthetic focus.`,
+        `List all ${ellisDesignNames().length} bespoke Ellis UI design templates as a compact index: name, title, concept, typography, palette, and available HTML pages. Use get_ellis_ui_template for the guidelines and page source.`,
       inputSchema: { type: "object", properties: {} },
     },
     {
       name: "get_ellis_ui_template",
       description:
-        "Fetch the HTML structure and CSS logic of a specific Ellis UI design system (e.g., 'backup_dossier' or 'backup_gameboy'). Returns both the design.md guidelines and the root index.html template.",
+        "Fetch a complete Ellis UI design system (e.g. 'backup_dossier' or 'backup_gameboy'): design.md plus every HTML page (index, letter, note, slideshow). Pass page to fetch a single page instead.",
       inputSchema: {
         type: "object",
         properties: {
@@ -748,6 +802,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             type: "string",
             description:
               "The folder name of the design (e.g. backup_nutrition, backup_gameboy, backup_swiss_archival)",
+          },
+          page: {
+            type: "string",
+            description:
+              "Optional HTML page filename to return alone (e.g. letter.html). Omit to return all pages.",
           },
         },
         required: ["design_name"],
@@ -1180,66 +1239,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "list_ellis_ui_designs": {
-        const ellisPath = join(
-          dirname(fileURLToPath(import.meta.url)),
-          "..",
-          "examples",
-          "ellis-ui",
-        );
+        const ellisPath = join(MCP_ROOT, "examples", "ellis-ui");
         if (!existsSync(ellisPath)) {
           throw new Error(
             `Ellis UI examples directory not found at ${ellisPath}`,
           );
         }
-        const dirs = ellisDesignNames();
-
-        let output = "Available Ellis UI Templates:\\n";
-        for (const d of dirs) {
-          const mdPath = join(ellisPath, d, "design.md");
-          if (existsSync(mdPath)) {
-            const lines = readFileSync(mdPath, "utf-8").split("\\n");
-            const titleLine = lines.find((l) =>
-              l.startsWith("# Design System:"),
-            );
-            const title = titleLine
-              ? titleLine.replace("# Design System: ", "")
-              : d;
-            output += `- ${d}: ${title}\\n`;
-          } else {
-            output += `- ${d}\\n`;
-          }
-        }
-        return textResult(name, output);
+        const templates = ellisDesignNames().map((design) =>
+          summarizeEllisDesign(design, join(ellisPath, design)),
+        );
+        return textResult(
+          name,
+          JSON.stringify({ count: templates.length, templates }, null, 2),
+        );
       }
 
       case "get_ellis_ui_template": {
-        const { design_name } = args as { design_name: string };
+        const { design_name, page } = args as {
+          design_name: string;
+          page?: string;
+        };
+        if (page !== undefined && typeof page !== "string") {
+          throw new Error("page must be an HTML filename string");
+        }
+        const ellisPath = join(MCP_ROOT, "examples", "ellis-ui");
         // Same CWE-22 rule as get_reference: a design folder name, not a path.
-        const designPath = resolveWithinRoot(
-          join(
-            dirname(fileURLToPath(import.meta.url)),
-            "..",
-            "examples",
-            "ellis-ui",
-          ),
-          design_name,
-          { label: "design_name", kind: "dir" },
-        );
+        const designPath = resolveWithinRoot(ellisPath, design_name, {
+          label: "design_name",
+          kind: "dir",
+        });
         if (!existsSync(designPath)) {
           throw new Error(
             `Design ${design_name} not found in Ellis UI examples.`,
           );
         }
+        const pages = ellisPages(designPath);
+        // Page selection is membership-checked against the real directory
+        // listing, so traversal names can never resolve.
+        const selected =
+          page === undefined
+            ? pages
+            : pages.filter((candidate) => candidate.name === page);
+        if (page !== undefined && selected.length === 0) {
+          throw new Error(
+            `Page ${page} not found in ${design_name}. Available: ${
+              pages.map((candidate) => candidate.name).join(", ") || "none"
+            }`,
+          );
+        }
         const mdPath = join(designPath, "design.md");
-        const htmlPath = join(designPath, "index.html");
         let output = "";
         if (existsSync(mdPath)) {
-          output += `--- DESIGN GUIDELINES ---\\n${readFileSync(mdPath, "utf-8")}\\n\\n`;
+          output += `--- DESIGN GUIDELINES (design.md) ---\n${readFileSync(mdPath, "utf-8")}\n\n`;
         }
-        if (existsSync(htmlPath)) {
-          output += `--- HTML TEMPLATE ---\\n${readFileSync(htmlPath, "utf-8")}\\n`;
+        for (const candidate of selected) {
+          output += `--- HTML PAGE: ${candidate.name} (${candidate.bytes} bytes) ---\n${readFileSync(join(designPath, candidate.name), "utf-8")}\n\n`;
         }
-        return textResult(name, output);
+        return textResult(name, output.trimEnd());
       }
 
       case "get_reference": {

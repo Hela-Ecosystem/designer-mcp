@@ -11,7 +11,7 @@ It was originally engineered as part of the anti-slop Ellis UI Library, demonstr
 
 ## Engineering & CSS Features
 * Custom 4-color monochrome CSS filter on photos (Game Boy Camera effect). Chunky borders, pixel grid background overlay.
-* **Zero Dependencies:** Built entirely with raw HTML/CSS (via Tailwind utility classes) without heavy JS frameworks.
+* **Runtime Dependencies:** No JS framework, but the pages load the Tailwind Play CDN, Google Fonts, and some third-party icon assets. The Play CDN is a development tool; compile Tailwind and self-host fonts and icons before shipping.
 * **Responsive:** Designed to scale beautifully from mobile viewports up to desktop resolutions.
 
 ## Reusability Guide
